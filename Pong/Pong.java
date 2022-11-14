@@ -16,8 +16,8 @@ public class Pong
     ArrayList<pongBall> b;
     TimerTask t;
 
-    static final double lc = 0;
-    static final double rc = 1;
+    static final double left = 0;
+    static final double right = 1;
     static final double startingSpeed = 0.004;
     static final double ballModifier = 0.04;
     static final Color ballCol = Color.gray;
@@ -28,8 +28,8 @@ public class Pong
     public Pong()
     {
         this.b = new ArrayList<>();
-        double leftCorner = lc;
-        double rightCorner = rc;
+        double leftCorner = left;
+        double rightCorner = right;
         double cen = (leftCorner + rightCorner) / 2;
 
         double leftStart = (leftCorner + rightCorner) * 0.1;
@@ -44,13 +44,13 @@ public class Pong
         double ballSize = (leftCorner + rightCorner) * ballModifier;
         double[] ballStart = {cen, cen};
 
+        double z = startingSpeed;
         for (int i = 0; i < 3; i++)
         {
-            double z = startingSpeed;
             this.b.add(new pongBall(ballStart[0], ballStart[1], ballSize, Math.random() * z - 2 * z, this));
         }
 
-        /*  Timer object to increase speed at defined intervals.  */
+        /*  Timer object to increase speed and colour at defined intervals.  */
         this.t = new TimerTask() {
             @Override
             public void run()
@@ -116,7 +116,7 @@ public class Pong
      */
     public void reset(pongPlayer p, pongBall bb)
     {
-        double cen = (rc + lc) / 2;
+        double cen = (right + left) / 2;
         System.out.println(bb.vel.x);
 
         bb.x = cen;
@@ -161,13 +161,13 @@ public class Pong
     private void drawScore()
     {
         StdDraw.setPenColor(Color.orange);
-        StdDraw.text(this.leftPlayer.x, rc * 0.9, this.leftPlayer.score+"");
-        StdDraw.text(this.rightPlayer.x, rc * 0.9, this.rightPlayer.score+"");
+        StdDraw.text(this.leftPlayer.x, right * 0.9, this.leftPlayer.score+"");
+        StdDraw.text(this.rightPlayer.x, right * 0.9, this.rightPlayer.score+"");
     }
 
     private void drawBorders()
     {
-        StdDraw.polygon(new double[]{lc, rc, rc, lc}, new double[]{lc, lc, rc, rc});
+        StdDraw.polygon(new double[]{left, right, right, left}, new double[]{left, left, right, right});
     }
 
     private boolean checkExit()
@@ -243,7 +243,7 @@ class pongBall
         }
 
         /*  Out of bounds check  */
-        if (this.x > Pong.rc)
+        if (this.x > Pong.right)
         {
             if (this.p1.x > this.p2.x)
             {
@@ -256,7 +256,7 @@ class pongBall
                 this.p.reset(p2, this);
             }
         }
-        else if (this.x < Pong.lc)
+        else if (this.x < Pong.left)
         {
             if (this.p1.x < this.p2.x)
             {
@@ -271,7 +271,7 @@ class pongBall
         }/*     Out of bounds end check     */
 
         /*  Roof hit check  */
-        if (this.y - this.r < Pong.lc || this.y + this.r> Pong.rc)
+        if (this.y - this.r < Pong.left || this.y + this.r> Pong.right)
             this.vel.y *= -1;
     }
 
@@ -298,7 +298,7 @@ class pongBall
         double y2 = p.y + half * p.h;
 
         boolean pastX = this.x - half * p.w < x2;
-        if (p.x > (Pong.rc + Pong.lc) / 2)
+        if (p.x > (Pong.right + Pong.left) / 2)
             pastX = this.x + half * p.w> x1;
 
         return (this.x + this.r > x1 && this.x - this.r < x2 && this.y + this.r > y1 && this.y - this.r < y2)
