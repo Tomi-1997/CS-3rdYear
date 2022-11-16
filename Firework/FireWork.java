@@ -130,7 +130,7 @@ public class FireWork extends WorldObject
             if (StdDraw.mousePressed() && firework_cd == 0)
             {
                fw.add(new FireWork(StdDraw.mouseX(), StdDraw.mouseY()));
-               firework_cd = 20;
+               firework_cd = 5;
             }
 
             for (FireWork f : fw)
@@ -164,7 +164,9 @@ class Flare extends WorldObject
         end_y = ey;
         double diff = Math.abs(this.x - end_x) * 0.01;
         double vel_x = this.x > ex ? diff * - 1 : diff;
-        v = new Velocity(vel_x, 0.015);
+
+        double vy = (Math.random() * 0.004) - 0.002;
+        v = new Velocity(vel_x, 0.016 + vy);
     }
 
     public void draw()
