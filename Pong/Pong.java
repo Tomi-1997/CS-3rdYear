@@ -16,38 +16,41 @@ public class Pong
     ArrayList<pongBall> b;
     TimerTask t;
 
-    static final double left = 0;
-    static final double right = 1;
-    static final double startingSpeed = 0.004;
-    static final double ballModifier = 0.04;
     static final Color ballCol = Color.gray;
-
-    static final double startingPSpeed = 0.015;
-    static final double pSpeedHigh = 0.020;
+    double left, right, startingSpeed, ballModifier, pSpeedHigh, startingPSpeed;
 
     public Pong()
     {
+        this(0, 1);
+    }
+
+    public Pong(double l, double r)
+    {
+        StdDraw.setScale(l ,r);
         this.b = new ArrayList<>();
-        double leftCorner = left;
-        double rightCorner = right;
-        double cen = (leftCorner + rightCorner) / 2;
+        this.left = l;
+        this.right = r;
+        double cen = (left + right) / 2;
+        this.startingSpeed = 0.004 * (left + right);
+        this.ballModifier = 0.04 * (left + right);
+        this.startingPSpeed = 0.015 * (left + right);
+        this.pSpeedHigh = 0.020 * (left + right);
 
-        double leftStart = (leftCorner + rightCorner) * 0.1;
-        double rightStart = (leftCorner + rightCorner) * 0.9;
+        double leftStart = (left + right) * 0.1;
+        double rightStart = (left + right) * 0.9;
 
-        double pHeight = (leftCorner + rightCorner) * 0.4;
-        double pWidth = (leftCorner + rightCorner) * 0.05;
-        double pSpeed = (leftCorner + rightCorner) * 0.01;
+        double pHeight = (left + right) * 0.4;
+        double pWidth = (left + right) * 0.05;
+        double pSpeed = (left + right) * 0.01;
         this.leftPlayer = new pongPlayer(leftStart, cen, pWidth, pHeight, pSpeed, KeyEvent.VK_W, KeyEvent.VK_S);
         this.rightPlayer = new pongPlayer(rightStart, cen, pWidth, pHeight, pSpeed, KeyEvent.VK_UP, KeyEvent.VK_DOWN);
 
-        double ballSize = (leftCorner + rightCorner) * ballModifier;
         double[] ballStart = {cen, cen};
 
         double z = startingSpeed;
         for (int i = 0; i < 3; i++)
         {
-            this.b.add(new pongBall(ballStart[0], ballStart[1], ballSize, Math.random() * z - 2 * z, this));
+            this.b.add(new pongBall(ballStart[0], ballStart[1], ballModifier, Math.random() * z - 2 * z, this));
         }
 
         /*  Timer object to increase speed and colour at defined intervals.  */
@@ -205,7 +208,7 @@ public class Pong
 class pongBall
 {
     Velocity vel;
-    double x, y, r, speed;
+    double x, y, r;
     pongPlayer p1, p2;
     Pong p;
     int hitCd;
@@ -216,7 +219,6 @@ class pongBall
         this.x = x;
         this.y = y;
         this.r = r;
-        this.speed = speed;
         this.p = p;
         this.p1 = p.leftPlayer;
         this.p2 = p.rightPlayer;
@@ -243,7 +245,7 @@ class pongBall
         }
 
         /*  Out of bounds check  */
-        if (this.x > Pong.right)
+        if (this.x > p.right)
         {
             if (this.p1.x > this.p2.x)
             {
@@ -256,7 +258,7 @@ class pongBall
                 this.p.reset(p2, this);
             }
         }
-        else if (this.x < Pong.left)
+        else if (this.x < p.left)
         {
             if (this.p1.x < this.p2.x)
             {
@@ -271,7 +273,7 @@ class pongBall
         }/*     Out of bounds end check     */
 
         /*  Roof hit check  */
-        if (this.y - this.r < Pong.left || this.y + this.r> Pong.right)
+        if (this.y - this.r < p.left || this.y + this.r> p.right)
             this.vel.y *= -1;
     }
 
@@ -289,17 +291,17 @@ class pongBall
     /** Returns true if ball is inside the player's rectangle.
      *
      */
-    public boolean in(pongPlayer p)
+    public boolean in(pongPlayer pl)
     {
         double half = 0.5;
-        double x1 = p.x - half * p.w;
-        double y1= p.y - half * p.h;
-        double x2 = p.x + half * p.w;
-        double y2 = p.y + half * p.h;
+        double x1 = pl.x - half * pl.w;
+        double y1= pl.y - half * pl.h;
+        double x2 = pl.x + half * pl.w;
+        double y2 = pl.y + half * pl.h;
 
-        boolean pastX = this.x - half * p.w < x2;
-        if (p.x > (Pong.right + Pong.left) / 2)
-            pastX = this.x + half * p.w> x1;
+        boolean pastX = this.x - half * pl.w < x2;
+        if (pl.x > (p.right + p.left) / 2)
+            pastX = this.x + half * pl.w> x1;
 
         return (this.x + this.r > x1 && this.x - this.r < x2 && this.y + this.r > y1 && this.y - this.r < y2)
                 && !pastX;
@@ -343,13 +345,10 @@ class pongPlayer
     {
         this.score++;
     }
+
     public void draw()
     {
         StdDraw.filledRectangle(this.x, this.y, 0.5 * this.w, 0.5 * this.h);
-    }
-    public void drawEdge()
-    {
-        StdDraw.rectangle(this.x, this.y, 0.5 * this.w, 0.5 * this.h);
     }
 }
 
