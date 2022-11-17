@@ -19,9 +19,8 @@ public class FireWork extends WorldObject
 
     FireWork(double end_x, double end_y)
     {
-//        sound("launch.wav");
-        f = new Flare(end_x, end_y);
-        sharp_arr = new ArrayList<>();
+        f = new Flare(end_x, end_y); /* at launch */
+        sharp_arr = new ArrayList<>(); /* explodes at peak height */
     }
 
     @Override
@@ -56,11 +55,14 @@ public class FireWork extends WorldObject
         sharp_arr.removeIf(x -> x.getLife_expect() == 0);
     }
 
+    /**
+     * Spawns a large amount of points around the current flare.
+     */
     public void explode()
     {
         sound("explode.wav");
         isFlare = false;
-        int n = 360;
+        int n = (int) (Math.random()*300) + 60;
         Color cl = CLs[(int) (CLs.length * Math.random())];
         for (int i = 0; i < n; i++)
         {
@@ -71,6 +73,9 @@ public class FireWork extends WorldObject
         }
     }
 
+    /**
+     * Returns a vector array bound by x squared and y squared (To make the shrapnel array form a circle).
+     */
     private double[] getRandXY()
     {
         double eps = 0.001;
@@ -130,7 +135,7 @@ public class FireWork extends WorldObject
             if (StdDraw.mousePressed() && firework_cd == 0)
             {
                fw.add(new FireWork(StdDraw.mouseX(), StdDraw.mouseY()));
-               firework_cd = 5;
+               firework_cd = 10;
             }
 
             for (FireWork f : fw)
@@ -195,7 +200,7 @@ class Shrapnel extends WorldObject
         this.y = f.y;
         this.v = v;
         this.cl = cl;
-        this.life_expect = le + (int)(Math.random() * le * 0.2);
+        this.life_expect = le + (int)((Math.random() * le * 0.6) - le * 0.3);
     }
     @Override
     public void draw()
@@ -208,6 +213,13 @@ class Shrapnel extends WorldObject
     {
         setX(this.x + this.v.x);
         setY(this.y + this.v.y);
+
+        if (this.life_expect < 100)
+        {
+            double z = 0.995;
+            v.setY(v.getY() * z);
+            v.setX(v.getX() * z);
+        }
 
         if (this.life_expect > 0)
             this.life_expect--;
