@@ -11,15 +11,15 @@ public class FireWork extends WorldObject
 {
     public static final double G = 0.0002;
     public static final Color CL = Color.white;
-    public static final Color[] CLs = {Color.MAGENTA, Color.cyan, Color.RED, Color.pink, Color.orange, Color.green,
-                                        Color.yellow};
+
     Flare f;
     ArrayList<Shrapnel> sharp_arr;
     boolean isFlare = true;
+    boolean extinguished = false;
 
-    FireWork(double end_x, double end_y)
+    FireWork(double target_x)
     {
-        f = new Flare(end_x, end_y); /* at launch */
+        f = new Flare(target_x); /* at launch */
         sharp_arr = new ArrayList<>(); /* explodes at peak height */
     }
 
@@ -41,7 +41,7 @@ public class FireWork extends WorldObject
         if (isFlare)
         {
             f.update();
-            if (f.v.y <= -0.002)
+            if (f.getV().y <= -0.002)
                 explode();
         }
         else
@@ -50,9 +50,9 @@ public class FireWork extends WorldObject
             {
                 s.update();
             }
+            sharp_arr.removeIf(x -> x.getLife_expect() == 0);
+            this.extinguished = (sharp_arr.size() == 0);
         }
-
-        sharp_arr.removeIf(x -> x.getLife_expect() == 0);
     }
 
     /**
@@ -62,8 +62,10 @@ public class FireWork extends WorldObject
     {
         sound("explode.wav");
         isFlare = false;
-        int n = (int) (Math.random()*300) + 60;
-        Color cl = CLs[(int) (CLs.length * Math.random())];
+        int n = (int) (Math.random()*400) + 100;
+//        Color cl = CLs[(int) (CLs.length * Math.random())];
+
+        Color cl = getRndCL();
         for (int i = 0; i < n; i++)
         {
             double[] pos = getRandXY();
@@ -71,6 +73,26 @@ public class FireWork extends WorldObject
             int life_expect = 200;
             sharp_arr.add(new Shrapnel(v, cl, life_expect, this.f));
         }
+    }
+
+    private Color getRndCL()
+    {
+        int r,g,b;
+        double brightness;
+        do
+        {
+            r = getRandRGB();
+            g = getRandRGB();
+            b = getRandRGB();
+            brightness = Color.RGBtoHSB(r, g, b, null)[2];
+        }
+        while(brightness < 0.55);
+        return new Color(r, g, b).brighter();
+    }
+
+    private int getRandRGB()
+    {
+        return (int) (Math.random() * 255);
     }
 
     /**
@@ -94,7 +116,7 @@ public class FireWork extends WorldObject
         return ans;
     }
 
-    public static void clear()
+    private static void clear()
     {
         StdDraw.clear(Color.black);
         StdDraw.setPenColor(CL);
@@ -122,6 +144,7 @@ public class FireWork extends WorldObject
     public static void main(String[] args)
     {
         StdDraw.setScale(0, 1);
+        StdDraw.setCanvasSize(700, 700);
         boolean run = true;
         ArrayList<FireWork> fw = new ArrayList<>();
         int firework_cd = 0;
@@ -134,7 +157,7 @@ public class FireWork extends WorldObject
 
             if (StdDraw.mousePressed() && firework_cd == 0)
             {
-               fw.add(new FireWork(StdDraw.mouseX(), StdDraw.mouseY()));
+               fw.add(new FireWork(StdDraw.mouseX()));
                firework_cd = 10;
             }
 
@@ -144,48 +167,56 @@ public class FireWork extends WorldObject
                 f.draw();
             }
 
-            StdDraw.show(0);
-            try {
-                Thread.sleep(1000/60);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            if (StdDraw.isKeyPressed(KeyEvent.VK_ESCAPE))
-                run = false;
+            delay();
+            run = checkExit();
+            fw.removeIf(x -> x.extinguished);
         }
         System.exit(0);
+    }
+
+    private static boolean checkExit()
+    {
+        // .
+        return !(StdDraw.isKeyPressed(KeyEvent.VK_ESCAPE));
+    }
+
+    private static void delay()
+    {
+        StdDraw.show(0);
+        try {
+            Thread.sleep(1000/60);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 }
 
 class Flare extends WorldObject
 {
-    double end_x, end_y;
-    public Flare(double ex, double ey)
+    public Flare(double target_x)
     {
         setX(Math.random());
         setY(0);
-        end_x = ex;
-        end_y = ey;
-        double diff = Math.abs(this.x - end_x) * 0.01;
-        double vel_x = this.x > ex ? diff * - 1 : diff;
+        double diff = Math.abs(this.getX() - target_x) * 0.01;
+        double vel_x = this.getX() > target_x ? diff * - 1 : diff;
 
         double vy = (Math.random() * 0.004) - 0.002;
-        v = new Velocity(vel_x, 0.016 + vy);
+        setV(new Velocity(vel_x, 0.016 + vy));
     }
 
     public void draw()
     {
         StdDraw.setPenColor(FireWork.CL);
-        StdDraw.circle(x, y, 0.002);
+        StdDraw.filledCircle(getX(), getY(), 0.002);
     }
 
     public void update()
     {
-        setX(this.x + this.v.x);
-        setY(this.y + this.v.y);
+        setX(this.getX() + this.getV().x);
+        setY(this.getY() + this.getV().y);
 
-        v.setY(v.getY() - FireWork.G);
+        getV().setY(getV().getY() - FireWork.G);
     }
 }
 
@@ -196,29 +227,29 @@ class Shrapnel extends WorldObject
 
     public Shrapnel(Velocity v, Color cl, int le, Flare f)
     {
-        this.x = f.x;
-        this.y = f.y;
-        this.v = v;
+        setX(f.getX());
+        setY(f.getY());
+        setV(v);
         this.cl = cl;
-        this.life_expect = le + (int)((Math.random() * le * 0.6) - le * 0.3);
+        this.life_expect = le + (int)((Math.random() * le * 0.8) - le * 0.6);
     }
     @Override
     public void draw()
     {
         StdDraw.setPenColor(cl);
-        StdDraw.point(this.x, this.y);
+        StdDraw.point(this.getX(), this.getY());
     }
     @Override
     public void update()
     {
-        setX(this.x + this.v.x);
-        setY(this.y + this.v.y);
+        setX(this.getX() + this.getV().getX());
+        setY(this.getY() + this.getV().getY());
 
-        if (this.life_expect < 100)
+        if (this.life_expect < 200)
         {
-            double z = 0.995;
-            v.setY(v.getY() * z);
-            v.setX(v.getX() * z);
+            double z = 0.994;
+            getV().setY(getV().getY() * z);
+            getV().setX(getV().getX() * z);
         }
 
         if (this.life_expect > 0)
@@ -233,8 +264,9 @@ class Shrapnel extends WorldObject
 
 class WorldObject
 {
-    Velocity v;
-    double x, y;
+    private Velocity v;
+    private double x, y;
+
     public void draw()
     {
         StdDraw.point(x, y);
