@@ -41,7 +41,7 @@ public class FireWork extends WorldObject
         if (isFlare)
         {
             f.update();
-            if (f.getV().y <= -0.002)
+            if (f.getV().y <= -0.002) /* Explode when it starts to fall */
                 explode();
         }
         else
@@ -62,16 +62,22 @@ public class FireWork extends WorldObject
     {
         sound("explode.wav");
         isFlare = false;
-        int n = (int) (Math.random()*400) + 100;
-//        Color cl = CLs[(int) (CLs.length * Math.random())];
 
+        /*  Number of firework particles \ shrapnel */
+        int n = (int) (Math.random()*400) + 100;
+
+        /* Get a random bright colour for shrapnel group */
         Color cl = getRndCL();
+
+        /* Get random size for group of shrapnel  */
+        double r = Math.random() * 0.0017;
+
         for (int i = 0; i < n; i++)
         {
             double[] pos = getRandXY();
             Velocity v = new Velocity(pos[0], pos[1]);
-            int life_expect = 200;
-            sharp_arr.add(new Shrapnel(v, cl, life_expect, this.f));
+            int life_expect = 200; /* Iterations until the single shrapnel is deleted */
+            sharp_arr.add(new Shrapnel(v, cl, life_expect, this.f, r));
         }
     }
 
@@ -79,15 +85,15 @@ public class FireWork extends WorldObject
     {
         int r,g,b;
         double brightness;
-        do
+        do /* Generate random colour until it is bright */
         {
             r = getRandRGB();
             g = getRandRGB();
             b = getRandRGB();
             brightness = Color.RGBtoHSB(r, g, b, null)[2];
         }
-        while(brightness < 0.55);
-        return new Color(r, g, b).brighter();
+        while(brightness < 0.5);
+        return new Color(r, g, b).brighter().brighter();
     }
 
     private int getRandRGB()
@@ -100,7 +106,7 @@ public class FireWork extends WorldObject
      */
     private double[] getRandXY()
     {
-        double eps = 0.001;
+        double eps = 0.01;
         double[] ans = new double[2];
         double x, y;
 
@@ -144,10 +150,12 @@ public class FireWork extends WorldObject
     public static void main(String[] args)
     {
         StdDraw.setScale(0, 1);
-        StdDraw.setCanvasSize(700, 700);
+        StdDraw.setCanvasSize(950, 950);
         boolean run = true;
         ArrayList<FireWork> fw = new ArrayList<>();
-        int firework_cd = 0;
+
+        /* Iterations between adding new fireworks */
+        int firework_cd = 5;
 
         while (run)
         {
@@ -158,7 +166,7 @@ public class FireWork extends WorldObject
             if (StdDraw.mousePressed() && firework_cd == 0)
             {
                fw.add(new FireWork(StdDraw.mouseX()));
-               firework_cd = 10;
+               firework_cd = 5;
             }
 
             for (FireWork f : fw)
@@ -224,32 +232,46 @@ class Shrapnel extends WorldObject
 {
     private int life_expect;
     private final Color cl;
+    private final double r;
 
-    public Shrapnel(Velocity v, Color cl, int le, Flare f)
+    public Shrapnel(Velocity v, Color cl, int le, Flare f, double rad)
     {
         setX(f.getX());
         setY(f.getY());
         setV(v);
         this.cl = cl;
+
+        /* Make life expect random to imitate real life fire works (kinda) */
         this.life_expect = le + (int)((Math.random() * le * 0.8) - le * 0.6);
+
+        /* Check radius is positive */
+        this.r = rad > 0 ? rad : 0;
     }
     @Override
     public void draw()
     {
         StdDraw.setPenColor(cl);
-        StdDraw.point(this.getX(), this.getY());
+        StdDraw.filledCircle(this.getX(), this.getY(), this.r);
     }
     @Override
     public void update()
     {
         setX(this.getX() + this.getV().getX());
         setY(this.getY() + this.getV().getY());
+        getV().setY(getV().getY() - FireWork.G * 0.04); /* Apply only fraction of gravity */
 
-        if (this.life_expect < 200)
+
+        /* Slow down up to a certain limit, until the shrapnel is floating down */
+        double z = 0.95;
+        double eps = 0.001;
+
+        double x = getV().getX();
+        double y = getV().getY();
+
+        if (x*x + y*y < eps) /* Keep vector a circular function (without this check it looks weird) */
         {
-            double z = 0.994;
-            getV().setY(getV().getY() * z);
-            getV().setX(getV().getX() * z);
+            getV().setY(y * z);
+            getV().setX(x * z);
         }
 
         if (this.life_expect > 0)
