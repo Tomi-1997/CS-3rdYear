@@ -6,13 +6,12 @@ import matplotlib.image as img
 import os, random
 import tensorflow.compat.v1 as tf
 import tensorflow.compat.v1.keras.preprocessing.image as tf_img
-import tf.config.list_physical_devices('GPU')
 import cv2
 tf.disable_v2_behavior()
 
 batch_size = 100
-img_height = 300
-img_width = 300
+img_height = 500
+img_width = 500
 
 directory = 'C:\\Users\\tomto\\PycharmProjects\\RandomStuff\\dog-breed-identification\\'
 labels = pd.read_csv(directory + '\\labels.csv')
@@ -75,8 +74,6 @@ def get_ans(id):
     return breed
 
 if __name__ == '__main__':
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-    exit(0)
     pixel_num = img_width * img_height
     pixels = tf.placeholder(tf.float32,[None, pixel_num])
     answers = tf.placeholder(tf.float32, [None, breeds_num])
@@ -92,10 +89,11 @@ if __name__ == '__main__':
     session.run(init)
 
     for i in range(1000):
-        batch_xs, batch_ys = get_dogs(2)
+        batch_xs, batch_ys = get_dogs(batch_size)
         session.run(train_step, feed_dict={pixels: batch_xs, answers: batch_ys})
 
     correct_prediction = tf.equal(tf.argmax(predicate,1), tf.argmax(answers,1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    print(session.run(accuracy, feed_dict={pixels: labels.get(key="id"), answers: labels.get(key="label")}))
+    batch, labels = get_dogs(batch_size)
+    print(session.run(accuracy, feed_dict={pixels: batch, answers: labels}))
