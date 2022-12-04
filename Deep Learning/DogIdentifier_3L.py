@@ -1,3 +1,9 @@
+# Results so far on learning rate of 0.1, 5 iterations before testing accuracy and loss
+# After 12161s, accuracy is 50%, loss is 2.4888787269592285
+# After 4962s, accuracy is 23%, loss is 3.5788869857788086
+# After 1100s, accuracy is 11%, loss is 4.441249370574951
+
+
 import winsound # for beep
 from array import array
 
