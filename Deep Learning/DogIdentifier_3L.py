@@ -1,4 +1,4 @@
-# Results so far on learning rate of 0.1, 5 iterations before testing accuracy and loss
+# Results so far [on training data, not validation] on learning rate of 0.1, 5 iterations before testing accuracy and loss
 # After 62516s, accuracy is 97%, loss is 0.31866762042045593
 # After 46119s, accuracy is 90%, loss is 0.5829817652702332
 # After 27661s, accuracy is 74%, loss is 1.3114298582077026
