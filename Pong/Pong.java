@@ -11,6 +11,14 @@ import java.util.TimerTask;
 
 public class Pong
 {
+    public static double SCREEN_SHAKE = 0.0;
+    public static double SCREEN_SHAKE_DEC = 0.001;
+    public static double SCREEN_SHAKE_LIM = 0.001;
+    public static int SHAKE_STATUS = 0;
+    public static final int SCREEN_SHAKE_UP = 1;
+    public static final int SCREEN_SHAKE_DOWN = -1;
+    public static final int SCREEN_SHAKE_DONE = 0;
+
     pongPlayer leftPlayer;
     pongPlayer rightPlayer;
     ArrayList<pongBall> b;
@@ -59,9 +67,9 @@ public class Pong
             public void run()
             {
                 for (pongBall bb : b)
-                    if (Math.abs(bb.vel.x) < startingPSpeed)
+                    if (Math.abs(bb.vel.x * 1.08) < startingPSpeed)
                     {
-                        bb.vel.x *= 1.07;
+                        bb.vel.x *= 1.08;
                         int r = bb.cl.getRed() + 4;
                         int g = bb.cl.getGreen() + 4;
                         int b = bb.cl.getBlue() + 4;
@@ -78,12 +86,19 @@ public class Pong
         StdDraw.setFont(font);
     }
 
+    public static void startShake(Velocity v)
+    {
+        SCREEN_SHAKE = (v.getX() * v.getX() + v.getY() * v.getY()) * 12.5;
+        SHAKE_STATUS = SCREEN_SHAKE_UP;
+    }
+
     public void start()
     {
         boolean run = true;
         while (run)
         {
             clear();
+            shake_update();
 
             leftPlayer.update();
             rightPlayer.update();
@@ -107,6 +122,22 @@ public class Pong
         System.exit(0);
     }
 
+    private void shake_update()
+    {
+        if (SHAKE_STATUS == SCREEN_SHAKE_UP)
+        {
+            SCREEN_SHAKE += SCREEN_SHAKE_DEC;
+            if (SCREEN_SHAKE >= SCREEN_SHAKE_LIM)
+                SHAKE_STATUS = SCREEN_SHAKE_DOWN;
+        }
+        if (SHAKE_STATUS == SCREEN_SHAKE_DOWN)
+        {
+            SCREEN_SHAKE -= SCREEN_SHAKE_DEC;
+            if (SCREEN_SHAKE <= -SCREEN_SHAKE_LIM)
+                SHAKE_STATUS = SCREEN_SHAKE_DONE;
+        }
+    }
+
     private void clear()
     {
         StdDraw.clear(Color.black);
@@ -120,8 +151,6 @@ public class Pong
     public void reset(pongPlayer p, pongBall bb)
     {
         double cen = (right + left) / 2;
-        System.out.println(bb.vel.x);
-
         bb.x = cen;
         bb.y = cen;
         bb.vel.x = Math.random() * startingSpeed;
@@ -163,14 +192,17 @@ public class Pong
 
     private void drawScore()
     {
+        double z = SCREEN_SHAKE;
         StdDraw.setPenColor(Color.orange);
-        StdDraw.text(this.leftPlayer.x, right * 0.9, this.leftPlayer.score+"");
-        StdDraw.text(this.rightPlayer.x, right * 0.9, this.rightPlayer.score+"");
+        StdDraw.text(this.leftPlayer.x + z, right * 0.9 + z, this.leftPlayer.score+"");
+        StdDraw.text(this.rightPlayer.x + z, right * 0.9 + z, this.rightPlayer.score+"");
     }
 
     private void drawBorders()
     {
-        StdDraw.polygon(new double[]{left, right, right, left}, new double[]{left, left, right, right});
+        double z = SCREEN_SHAKE;
+        StdDraw.polygon(new double[]{left + z, right + z, right + z, left + z},
+                new double[]{left + z, left + z, right + z, right + z});
     }
 
     private boolean checkExit()
@@ -234,6 +266,7 @@ class pongBall
 
         if (hit() && this.hitCd == 0)
         {
+            Pong.startShake(vel);
             this.hitCd = 20;
             this.p.hitSound("block_hit.wav");
             this.vel.x *= -1;
@@ -310,7 +343,7 @@ class pongBall
     public void draw()
     {
         StdDraw.setPenColor(cl);
-        StdDraw.filledCircle(this.x, this.y, this.r);
+        StdDraw.filledCircle(this.x + Pong.SCREEN_SHAKE, this.y + Pong.SCREEN_SHAKE, this.r);
     }
 }
 
@@ -348,7 +381,8 @@ class pongPlayer
 
     public void draw()
     {
-        StdDraw.filledRectangle(this.x, this.y, 0.5 * this.w, 0.5 * this.h);
+        StdDraw.filledRectangle(this.x + Pong.SCREEN_SHAKE, this.y + Pong.SCREEN_SHAKE,
+                0.5 * this.w, 0.5 * this.h);
     }
 }
 
