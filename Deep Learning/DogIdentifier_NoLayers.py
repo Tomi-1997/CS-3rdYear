@@ -26,19 +26,25 @@ VALID_NAMES = random.sample(DATA_NAMES, int(len(DATA_NAMES) * 0.2))   # 20% of f
 TRAIN_NAMES = [fname for fname in DATA_NAMES if fname not in VALID_NAMES] # rest
 
 # Check to see sample size is valid.
-# print(f'valid:{len(VALID_NAMES)}, train:{len(TRAIN_NAMES)}')
-# print(f'valid+train={len(VALID_NAMES)+len(TRAIN_NAMES)}=={len(DATA_NAMES)}:all')
+assert(len(VALID_NAMES) + len(TRAIN_NAMES) == len(DATA_NAMES)) # Validate uniform scattering of data
+
 
 img_height = 200
 img_width = 200
 
-batch_size = breeds_num + 1
-learning_rate = 0.1
-iters = 100  # Iterations before checking accuracy
-epochs = 50
+batch_size = 20
+iters = 1000  # Iterations before checking accuracy
+epochs = 10
+
+train_accuracy_tracker = []
+train_loss_tracker = []
+train_accuracy_avg_tracker = []
+train_loss_avg_tracker = []
 
 accuracy_tracker = []
 loss_tracker = []
+accuracy_avg_tracker = []
+loss_avg_tracker = []
 
 def init_label_vector(i:int):
     """Constructs and returns a vector of ones and zeros corresponding to the dog's breed."""
@@ -107,7 +113,7 @@ def get_breed(id):
         if dog[0] == new_id:
             return dog[1]
 
-def plot(epochs, acc, loss):
+def plot(epochs, acc, loss, train_acc, train_loss):
     x_acc = [i for i in range(epochs)]
     y_acc = acc
 
@@ -117,14 +123,19 @@ def plot(epochs, acc, loss):
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 2, 1)
     ax2 = fig.add_subplot(1, 2, 2)
-    ax1.plot(x_acc, y_acc, label='accuracy')
-    ax2.plot(x_loss, y_loss, label='loss')
+
+    ax1.plot(x_acc, y_acc, label='validation')
+    ax1.plot(x_acc, train_acc, label='train')
+
+    ax2.plot(x_loss, y_loss, label='validation')
+    ax2.plot(x_loss, train_loss, label='train')
+
     ax1.set_xlabel('epochs')
     ax1.set_title('accuracy')
-    # ax1.legend()
+    ax1.legend()
     ax2.set_xlabel('epochs')
     ax2.set_title('loss')
-    # ax2.legend()
+    ax2.legend()
 
     plt.show()
     plt.show()
@@ -142,7 +153,7 @@ def predict(session, prediction, x_data, filepath):
     output = np.argmax(output)
     print("your prediction result is:", breeds[output])
 
-def train_model():
+def train_model(learning_rate):
     # Unmark this only if you have the original backup folder of pictures.
     # resize_all(img_width, img_height)
 
@@ -154,7 +165,7 @@ def train_model():
     answers = tf.placeholder(tf.float32, [None, breeds_num], name="answers")
 
     # Defining layers
-    weights = tf.Variable(tf.truncated_normal([pixel_num, breeds_num], stddev=0.1), name="wieghts")
+    weights = tf.Variable(tf.truncated_normal([pixel_num, breeds_num], stddev=0.1), name="weights")
     bias = tf.Variable(tf.constant(0.1, shape=[breeds_num]), name="bias")
     prediction = tf.nn.relu(tf.matmul(pixels, weights) + bias)
 
@@ -177,8 +188,16 @@ def train_model():
 
         for _ in range(iters): # Train
             batch_xs, batch_ys = get_dogs(batch_size, train=True)
-            session.run(train_step, feed_dict={pixels: batch_xs, answers: batch_ys})
-            debug = True
+            train_acc, train_ls, _ = session.run([accuracy, loss, train_step], feed_dict={pixels: batch_xs, answers: batch_ys})
+
+            train_accuracy_tracker.append(float(train_acc))
+            train_loss_tracker.append(train_ls)
+
+        train_avg_acc = sum(train_accuracy_tracker) / len(train_accuracy_tracker)
+        train_avg_loss = sum(train_loss_tracker) / len(train_loss_tracker)
+
+        train_accuracy_avg_tracker.append(float(train_avg_acc))
+        train_loss_avg_tracker.append(train_avg_loss)
 
         batch_xs, batch_ys = get_dogs(batch_size, train=False) # Validate
         acc, ls = session.run([accuracy, loss], feed_dict={pixels: batch_xs, answers: batch_ys})
@@ -186,6 +205,13 @@ def train_model():
         # Add loss and accuracy to plot later
         accuracy_tracker.append(float(acc))
         loss_tracker.append(ls)
+
+        avg_acc = sum(accuracy_tracker) / len(accuracy_tracker)
+        avg_loss = sum(loss_tracker) / len(loss_tracker)
+        print(f'After {int(time.time() - start)}s, accuracy avg {avg_acc:.0%}, loss avg {avg_loss}')
+
+        loss_avg_tracker.append(avg_loss)
+        accuracy_avg_tracker.append(avg_acc)
 
         # print(session.run(weights[-1], feed_dict={pixels: batch_xs, answers: batch_ys}))
         # print(f'After {int(time.time() - start)}s, accuracy is {acc:.0%}, loss is {ls}')
@@ -196,11 +222,15 @@ def train_model():
 
     winsound.Beep(440, 500)
 
-    predict(session, prediction, pixels, directory + "\\bonito\\1.jpg")
-    predict(session, prediction, pixels, directory + "\\bonito\\2.jpg")
-    predict(session, prediction, pixels, directory + "\\bonito\\3.jpg")
-    plot(epochs, accuracy_tracker, loss_tracker)
+    try:
+        predict(session, prediction, pixels, directory + "\\bonito\\1.jpg")
+        predict(session, prediction, pixels, directory + "\\bonito\\2.jpg")
+        predict(session, prediction, pixels, directory + "\\bonito\\3.jpg")
+    except:
+        pass
+
+    plot(epochs, accuracy_avg_tracker, loss_avg_tracker, train_accuracy_avg_tracker, train_loss_avg_tracker)
     return prediction
 
 if __name__ == '__main__':
-    model = train_model()
+    model = train_model(learning_rate=0.001)
