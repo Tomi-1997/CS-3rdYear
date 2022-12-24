@@ -1,4 +1,3 @@
-import random
 class Data:
     def __init__(self, feat:list, lab:int):
         self.features = feat
