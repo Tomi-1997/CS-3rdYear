@@ -1,4 +1,3 @@
-# TODO FIX DIFFERENCE
 import math
 import random
 import time
@@ -19,8 +18,16 @@ class Data:
             repr += str(f) + " "
         return "\n" + repr + ")]"
 
-LABELS = [1, 2]
 
+## Try to generalise as much as possible,
+# by changing variables below this could work on the float datatype given in the previous ex.
+SEPARATOR = ","
+
+LABELS = [1, 2]
+LABEL_TYPE = int
+
+FEATURES_NUM = 3
+DATA_TYPE = int
 
 def d(p1:Data, p2:Data, Lp):
     """Returns distance between two points, based on a given Lp. (1, 2 or inf)"""
@@ -96,18 +103,17 @@ def get_data(x_per_line:int, filepath:str, separator:str):
             line = line.replace("\n", "").split(separator)
             for i, val in enumerate(line):
                 if (i == len(line) - 1): ## Last element is label, else is a feature
-                    label = int(val)
+                    label = LABEL_TYPE(val)
                 else:
-                    features.append(int(val))
+                    features.append(DATA_TYPE(val))
             samples.append( Data(features= features, label= label) )
     return samples
 
 if __name__ == '__main__':
     # Prepare data
-    filepath = "C:\\Users\טומי\Desktop\ML_EX_4\haberman.data"
-    features_num = 3
-    samples = get_data(x_per_line=features_num, filepath=filepath, separator=',')
-    runs = 1
+    filepath = "C:\\Users\\tomto\\Desktop\\tomi\\3rdyear\\Winter\\EX\\ML\\4\\haberman.data"
+    samples = get_data(x_per_line=FEATURES_NUM, filepath=filepath, separator=SEPARATOR)
+    runs = 100
 
     # Run algo
     start = time.time()
@@ -124,7 +130,7 @@ if __name__ == '__main__':
             space = "  " if Lp != math.inf else ""
             all_errors_detail.append("\nk=" + str(k) + ", lp=" + str(Lp) + space + ", E=")
             all_errors_detail.append("k=" + str(k) + ", lp=" + str(Lp) + space + ", T=")
-            all_errors_detail.append("k=" + str(k) + ", lp=" + str(Lp) + space + ", DIFF=")
+            all_errors_detail.append("k=" + str(k) + ", lp=" + str(Lp) + space + ", D=")
 
     # start running k-nearest algo with varying k and distance function
     for _ in range(runs):
@@ -132,11 +138,14 @@ if __name__ == '__main__':
         for k in k_:
             for Lp in Lp_:
                 empiric_err, true_err = nearest_neighbours(k, Lp, samples)
+                ## Add training error dividied by how many runs there are
                 all_errors[stage] += empiric_err / runs
                 stage += 1
+                ## Add true error divided by how many runs there are
                 all_errors[stage] += true_err / runs
                 stage += 1
-                all_errors[stage] = math.fabs((true_err - empiric_err) / runs)
+                ## Take latest errors and mark the difference.
+                all_errors[stage] = math.fabs((all_errors[stage - 1] - all_errors[stage - 2]))
                 stage += 1
 
     for detail, value in zip(all_errors_detail,all_errors):
