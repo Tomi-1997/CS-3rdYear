@@ -12,7 +12,7 @@ int main()
 char command[1024];
 char *token;
 char *outfile;
-int i, fd, amper, redirect, err_redirect, retid, status;
+int i, fd, amper, redirect, redirect_app, err_redirect, retid, status;
 char *argv[10];
 char* prompt = "hello:";
 
@@ -45,12 +45,20 @@ while (1)
     else 
         amper = 0; 
 
-    if (! strcmp(argv[i - 2], ">")) 
+    if (!strcmp(argv[i - 2], ">") || !strcmp(argv[i - 2], ">>")) 
     {
+	if (!strcmp(argv[i - 2], ">>"))
+	{
+		redirect_app = 1;
+	}
+	else
+	{
+		redirect_app = 0;
+	}
         redirect = 1;
         argv[i - 2] = NULL;
         outfile = argv[i - 1];
-        }
+    }
     else 
         redirect = 0; 
 
@@ -73,7 +81,10 @@ while (1)
         /* redirection of IO ? */
         if (redirect) 
 	{
-            fd = creat(outfile, 0660); 
+	    if (redirect_app)
+		    fd = open(outfile, O_RDWR | O_APPEND | O_CREAT);
+	    else
+            	fd = creat(outfile, 0660); 
             close (STDOUT_FILENO) ; 
             dup(fd); 
             close(fd); 
@@ -83,9 +94,14 @@ while (1)
 	/* redirection of ERR? */
 	if (err_redirect)
 	{
+		fd = creat(outfile, 0660);
+		close(STDERR_FILENO);
+		dup(fd);
+		close(fd);
 	}
         execvp(argv[0], argv);
     }
+
     /* parent continues here */
     if (amper == 0)
         retid = wait(&status);
