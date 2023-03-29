@@ -19,12 +19,19 @@ HS_ALL = []
 ALT_ALL = []
 NN_ALL = []
 
+def paint_ship(alt, ang, NN):
+    pass
+
 def plot(y, xargs):
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 2, 1)
+    ax1.plot(xargs[0], label = 'vs')
+    ax1.plot(y, label = 'dvs')
+    ax1.legend()
 
-    ax1.plot(xargs[0])
-    ax1.plot(y)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(xargs[1])
+    ax2.set_title('Alt')
 
     plt.show()
 
@@ -43,9 +50,8 @@ def acc(weight, main, seconds):
     return ans
 
 def get_dvs(alt):
-    if alt > 2000: return 20
-    if alt > 500: return 10
-    return 2
+    # Between 1.5 and 30.
+    return max(min(30, math.log(alt, 2) * 2) - 1, 1.5)
 
 def simulate():
 
@@ -53,12 +59,12 @@ def simulate():
 
     print("Simulating Bereshit's Landing:")
     vs = random.uniform(20, 30)
+    # vs = 30
     hs = 932
-    hs = hs + minorplus(hs, 0.1)
+    hs = hs + minorplus(hs, 0.1) ## Hs +- 10%
     dist = 181 * 1000
     ang = random.uniform(50, 70)
-    alt = 13748
-    alt = alt + minorplus(alt, 0.1)
+    alt = random.randint(12000, 15000) # old val 13748
     time = 0
     dt = 1
     acc = 0
@@ -69,12 +75,30 @@ def simulate():
     print(info)
     NN = 0.7
 
+    LAND_MODE = 500
     while alt > 0:
+
+        ## Lose of orientation
+        # if alt < 2000:
+        #     ang = random.randint(0, 360)
+
+        if alt < LAND_MODE and ang > 0:
+            ang -= 1
+        if alt < LAND_MODE:
+            dt = 0.1
+
         if time % 10 == 0 or alt < 100:
-            print(f'{time}, {vs}, {hs}, {dist}, {alt}, {ang}, {weight}, {acc}')
+            # print(f'{time}, {vs}, {hs}, {dist}, {alt}, {ang}, {weight}, {acc}')
+            print(f"time:{time}, vs:{vs}, hs:{hs}, alt:{alt}, fuel:{fuel}")
 
         dvs = get_dvs(alt)
-        NN = pid.calc_error(vs, dvs)
+        NN += pid.calc_error(vs, dvs)
+        if NN > 1: NN = 1
+        if NN < 0: NN = 0
+        #
+        # if alt < 500:
+        #     if ang > 3: ang-= 3
+        #     else: ang = 0
 
         ang_rad = math.radians(ang);
         h_acc = math.sin(ang_rad) * acc;
@@ -89,10 +113,12 @@ def simulate():
             acc = NN * accMax(weight)
 
         else:
+            print(f'no fuel!')
             acc=0
 
         v_acc -= vacc;
         if hs > 0: hs -= h_acc * dt
+        else: hs = 0
         dist -= hs * dt;
         vs -= v_acc * dt;
         alt -= dt * vs;
@@ -103,15 +129,15 @@ def simulate():
         ALT_ALL.append(alt)
         NN_ALL.append(NN)
 
-    print(f"time:{time}, vs:{vs}, hs:{vs}, dist:{dist}, alt:{alt}, ang:{ang}, weight:{weight}, acc:{acc}")
+    print(f"time:{time}, vs:{vs}, hs:{hs}, dist:{dist}, alt:{alt}, ang:{ang}, weight:{weight}, acc:{acc}")
 
     safe_speed = 2.5
-    if alt < safe_speed and vs < safe_speed and hs < safe_speed:
+    if vs < safe_speed and hs < safe_speed:
         print('landed!')
     else:
         print(f'crashed at the speed of {vs}')
 
-    plot(DVS_ALL, [VS_ALL])
+    plot(DVS_ALL, [VS_ALL, ALT_ALL])
 
 if __name__ == '__main__':
     simulate()
