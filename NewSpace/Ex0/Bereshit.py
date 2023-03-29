@@ -12,7 +12,6 @@ SECOND_BURN = 0.009
 
 ALL_BURN = MAIN_BURN + 8*SECOND_BURN
 
-
 VS_ALL = []
 DVS_ALL = []
 HS_ALL = []
@@ -34,10 +33,6 @@ def plot(y, xargs):
     ax2.set_title('Alt')
 
     plt.show()
-
-def minorplus(number, percent):
-    z = random.random()
-    return number * percent * z if random.random() > 0.5 else - number * percent * z
 
 def accMax(weight):
     return acc(weight, True, 8);
@@ -61,7 +56,7 @@ def simulate():
     vs = random.uniform(20, 30)
     # vs = 30
     hs = 932
-    hs = hs + minorplus(hs, 0.1) ## Hs +- 10%
+    hs = random.uniform(hs * 0.9, hs * 1.1)
     dist = 181 * 1000
     ang = random.uniform(50, 70)
     alt = random.randint(12000, 15000) # old val 13748
@@ -95,10 +90,6 @@ def simulate():
         NN += pid.calc_error(vs, dvs)
         if NN > 1: NN = 1
         if NN < 0: NN = 0
-        #
-        # if alt < 500:
-        #     if ang > 3: ang-= 3
-        #     else: ang = 0
 
         ang_rad = math.radians(ang);
         h_acc = math.sin(ang_rad) * acc;
