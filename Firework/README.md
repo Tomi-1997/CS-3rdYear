@@ -1,11 +1,15 @@
-# Firework
-
-# How to run:
-- download fireworks.jar and navigate to that folder in the command line
-- type in :
+# 🎇🎆 Fireworks 🎆🎇
+![D](https://github.com/Tomi-1997/CS-3rdYear/blob/main/Firework/demo2.gif) <br>
+## How to run: <br>
+🧨 download fireworks.jar and place it in the desktop<br>
+🧨 open the command line. (type cmd in search bar)<br>
+🧨 type in the command line: <br>
+```
+cd desktop
+```
+🧨type again in the command line: <br>
 ```
 java -jar fireworks.jar 
 ```
 
-## 
-![D](https://github.com/Tomi-1997/CS-3rdYear/blob/main/Firework/demo2.gif)
+🔊 explode.wav can be downloaded and put in the same directory
