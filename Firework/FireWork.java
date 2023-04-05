@@ -9,6 +9,44 @@ import java.util.ArrayList;
 
 public class FireWork extends WorldObject
 {
+    public static void main(String[] args)
+    {
+        int w = (int)(Toolkit.getDefaultToolkit().getScreenSize().width * 0.3);
+        StdDraw.setXscale(0, 1);
+        StdDraw.setCanvasSize(w, w);
+        boolean run = true;
+        ArrayList<FireWork> fw = new ArrayList<>();
+
+        /* Iterations between adding new fireworks */
+        int firework_cd = 3;
+
+        while (run)
+        {
+            clear();
+            if (firework_cd > 0)
+                firework_cd--;
+
+            /* Mouse press - add firework. (if cd is 0) */
+            if (StdDraw.mousePressed() && firework_cd == 0)
+            {
+                fw.add(new FireWork(StdDraw.mouseX()));
+                firework_cd = 5;
+            }
+
+            for (FireWork f : fw)
+            {
+                f.update();
+                f.draw();
+            }
+
+            delay();
+            run = checkExit();
+            /* Remove all fireworks that passed their life expectancy */
+            fw.removeIf(x -> x.extinguished);
+        }
+        System.exit(0);
+    }
+
     public static final double G = 0.0002;
     public static final Color CL = Color.white;
 
@@ -60,7 +98,9 @@ public class FireWork extends WorldObject
      */
     public void explode()
     {
-        sound("explode.wav");
+        try { sound("explode.wav"); }
+        catch (Exception ignored) {}
+
         isFlare = false;
 
         /*  Number of firework particles \ shrapnel */
@@ -70,7 +110,7 @@ public class FireWork extends WorldObject
         Color cl = getRndCL();
 
         /* Get random size for group of shrapnel  */
-        double r = Math.random() * 0.0017;
+        double r = Math.random() * 0.002;
 
         for (int i = 0; i < n; i++)
         {
@@ -147,41 +187,6 @@ public class FireWork extends WorldObject
 
     }
 
-    public static void main(String[] args)
-    {
-        StdDraw.setScale(0, 1);
-        StdDraw.setCanvasSize(950, 950);
-        boolean run = true;
-        ArrayList<FireWork> fw = new ArrayList<>();
-
-        /* Iterations between adding new fireworks */
-        int firework_cd = 5;
-
-        while (run)
-        {
-            clear();
-            if (firework_cd > 0)
-                firework_cd--;
-
-            if (StdDraw.mousePressed() && firework_cd == 0)
-            {
-               fw.add(new FireWork(StdDraw.mouseX()));
-               firework_cd = 5;
-            }
-
-            for (FireWork f : fw)
-            {
-                f.update();
-                f.draw();
-            }
-
-            delay();
-            run = checkExit();
-            fw.removeIf(x -> x.extinguished);
-        }
-        System.exit(0);
-    }
-
     private static boolean checkExit()
     {
         // .
@@ -231,6 +236,7 @@ class Flare extends WorldObject
 class Shrapnel extends WorldObject
 {
     private int life_expect;
+    private final int life_expect_start;
     private final Color cl;
     private final double r;
 
@@ -243,6 +249,7 @@ class Shrapnel extends WorldObject
 
         /* Make life expect random to imitate real life fire works (kinda) */
         this.life_expect = le + (int)((Math.random() * le * 0.8) - le * 0.6);
+        this.life_expect_start = this.life_expect;
 
         /* Check radius is positive */
         this.r = rad > 0 ? rad : 0;
@@ -250,9 +257,31 @@ class Shrapnel extends WorldObject
     @Override
     public void draw()
     {
+
+        if (life_expect_start - life_expect > 4 && life_expect > 175)
+        { /* Draw tail a bit after explosion, and while it has a high velocity */
+            drawTrail();
+        }
+
         StdDraw.setPenColor(cl);
         StdDraw.filledCircle(this.getX(), this.getY(), this.r);
     }
+
+    private void drawTrail()
+    {
+        StdDraw.setPenColor(cl.darker().darker().darker().darker());
+        double x = getX() - getV().getX();
+        double y = getY() - getV().getY();
+
+        int tailLength = 5;
+        for (int i = 0; i < tailLength; i++)
+        {
+            StdDraw.filledCircle(x, y, this.r);
+            x -= getV().getX();
+            y -= getV().getY();
+        }
+    }
+
     @Override
     public void update()
     {
