@@ -11,5 +11,5 @@ cd desktop
 ```
 java -jar fireworks.jar 
 ```
-
+👆 click on a spot to launch fireworks in that direction
 🔊 explode.wav can be downloaded and put in the same directory
