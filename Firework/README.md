@@ -1,6 +1,6 @@
 # Firework
 
-## How to run:
+# How to run:
 - download fireworks.jar and navigate to that folder in the command line
 - type in :
 ```
