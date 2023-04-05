@@ -265,7 +265,7 @@ int main()
 {    
     while (1)
     {
-        get_command(-1);             // Parse command into argv[]
+        get_command(-1);            // Parse commands into argv[], or reload from history.
 
         if (argv[0] == NULL)        // If empty- skip
             continue;
