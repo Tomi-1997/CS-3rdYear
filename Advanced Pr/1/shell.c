@@ -9,11 +9,13 @@
 
 #define PROMPT_LEN 64
 #define CMD_SIZE 1024
+#define REMEMBER_SIZE 100
 
 char* token;
 char* outfile;
 char* argv[10][10];
 char command[CMD_SIZE];
+char history[REMEMBER_SIZE][CMD_SIZE];
 char prompt[PROMPT_LEN] = "hello:";
 int i, fd, amper, redirect, redirect_app, 
                 err_redirect, retid, status, cmds_count;
@@ -34,11 +36,92 @@ int change_prompt(char* prompt, char* newp)
 	return 0;
 }
 
-int get_command()
+int remember_command()
 {
-    memset(command, '\0', sizeof(command));
-    fgets(command, CMD_SIZE, stdin);
-    command[strlen(command) - 1] = '\0';
+    // Move previous commands up
+    for (int i = REMEMBER_SIZE - 1; i > 0; i--)
+    {
+        strcpy(history[i], history[i - 1]);
+    }
+
+    // First entry is the newest command.
+    strcpy(history[0], command);
+}
+
+int temp()
+{
+    FILE *fptr;
+   // use appropriate location if you are using MacOS or Linux
+   fptr = fopen("temp","a+"); // append
+   if(fptr == NULL)
+   {
+      printf("Error!");   
+      exit(1);             
+   }
+   fprintf(fptr,"%s\n",history[0]);
+   fclose(fptr);
+   return 0;
+}
+
+int get_command(int history_index)
+{
+    /* History index is -1, new command incoming */
+    if (history_index == -1)
+    {
+        printf("%s ", prompt);
+        memset(command, '\0', sizeof(command));
+        fgets(command, CMD_SIZE, stdin);
+    }
+
+    else
+    {
+        /* History index is not -1, append incoming input into an existing command */
+        strcpy(command, history[history_index]);
+        printf("%s %s", prompt, command);
+        char temp_command[CMD_SIZE];
+        fgets(temp_command, CMD_SIZE, stdin);
+        strncat(command, temp_command, strlen(temp_command));
+    }
+
+    int len = strlen(command) - 1;
+    command[len] = '\0';
+
+    // Is last character arrow?
+    if (command[len - 3] == '\033')
+    {
+            switch (command[len - 1])
+            {
+                case 'A':                                   // Up arrow
+                    if (history_index < REMEMBER_SIZE - 1)  // Make sure within limits
+                    {
+                        history_index++;
+                    }
+                    break;
+                case 'B': // Down arrow
+                    if (history_index > -1)                 // Can go back to previous commands
+                    {
+                        history_index--;
+                    }
+                    else                                    // Can't go further down, reached bottom of history list 
+                    {
+                    }
+            }
+
+            return get_command(history_index);
+    }
+
+    // Is !! command?
+    if (strcmp(command, "!!") == 0)
+    {
+        strcpy(command, history[0]);
+    }
+    
+    // Is new command?
+    if (!(strcmp(command, history[0]) == 0))
+    {
+        remember_command();
+        temp();
+    }
 
     /* parse command line */
     i = 0;
@@ -118,7 +201,7 @@ int update_io()
     err_redirect = 0;
 
     if (i < 2)
-        return 0;      // Enough cmds have io or &
+        return 0;      // Is command long enough to have an & command
 
     int out_i = i - 1; // Temporary i index to hold filename pos
 
@@ -129,7 +212,7 @@ int update_io()
         out_i--; // If & is present, then filename pos is second to last
     }
 
-    if (i < 3)      // Enough cmds to have io re-direction
+    if (i < 3)      // Is command long enough to have io commands
         return 0;
 
     if (strcmp(argv[cmds_count][out_i - 1], ">") == 0)
@@ -153,12 +236,36 @@ int update_io()
     return 0;
 }
 
+int change_dir(char* target)
+{
+    return chdir(target);
+}
+
+int exec_shell(char** bash_args)
+{
+    int res = 1;
+
+    if (strcmp(bash_args[0], "cd") == 0)
+        res = change_dir(bash_args[1]);
+
+    return res;
+}
+
+int shell_command(char* cmd)
+{
+    int ans = 1;
+
+    if (strcmp(cmd, "cd") == 0)
+        ans = 0;
+
+    return ans;
+}
+
 int main() 
 {    
     while (1)
     {
-        printf("%s ", prompt);      // Print promot 
-        get_command();              // Parse command into argv[]
+        get_command(-1);             // Parse command into argv[]
 
         if (argv[0] == NULL)        // If empty- skip
             continue;
@@ -169,6 +276,12 @@ int main()
         if (prompt_cmd(argv[0]))       // If prompt command - validate and change
         {
             change_prompt(prompt, argv[0][2]);
+            continue;
+        }
+
+        if (shell_command(argv[0][0]) == 0)
+        {
+            exec_shell(argv[0]);
             continue;
         }
         
@@ -205,5 +318,6 @@ int main()
         if (amper == 0)
             retid = wait(&status);
     }
+
     return 0;
 }
