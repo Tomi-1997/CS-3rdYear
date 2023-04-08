@@ -10,22 +10,32 @@
 #define PROMPT_LEN 64
 #define CMD_SIZE 1024
 #define REMEMBER_SIZE 100
+#define VAR_MAX 64
+
+struct local_var_
+{
+  char name[64];
+  char value[64];
+} typedef local_var;
 
 char* token;
 char* outfile;
+
 char* argv[10][10];
 char command[CMD_SIZE];
+local_var variables[VAR_MAX];
 char history[REMEMBER_SIZE][CMD_SIZE];
 char prompt[PROMPT_LEN] = "hello:";
-int i, fd, amper, redirect, redirect_app, 
-                err_redirect, retid, status, cmds_count;
 
+int i, fd, amper, redirect, redirect_app, 
+err_redirect, retid, status, cmds_count, var_table_size;
 
 int change_prompt(char* prompt, char* newp)
 {
 	int len = strlen(newp);
 	
 	int i = 0;
+    /* Overwrite previous prompt until new prompt is over or stop at the middle if it's too long */
 	while (i < len && i < PROMPT_LEN - 1)
 	{
 		prompt[i] = newp[i];
@@ -63,28 +73,90 @@ int temp()
    return 0;
 }
 
+char* get_val(int index)
+{
+    return variables[index].value;
+}
+
+int find_var(local_var* table, char* target)
+{
+    for (int i = 0; i < var_table_size; i++)
+    {
+        // Found variable with the same name, return the index
+        if (strcmp(table[i].name, target) == 0)
+            {
+                return i;
+            }
+    }
+    return -1;
+}
+
+int swap_variables(char** args)
+{
+    int i = 0;
+    while (args[i] != NULL)
+    {
+        /* Starts with $ sign? */
+        if (args[i][0] == '$')
+        {
+            /* Is there a variable with the same name? */
+            int vari = find_var(variables, ++args[i]); // call find_var while ignoring $ by incrementing the pointer.
+
+            /* If so, replace current token with the value */
+            if (vari != -1)
+                strcpy(args[i], get_val(vari));
+        }
+        i++;
+    }
+    return 0;
+}
+
+int add_var(local_var* table, char* var, char* val)
+{   
+    if (var == NULL || val == NULL || var_table_size >= VAR_MAX)
+        return 0;
+
+    int vari = find_var(table, var);
+    /* If it's not in the table, add it and increase the current size */
+    if (vari == -1)
+    {
+        vari = var_table_size;
+        var_table_size++;
+    }
+    strcpy(table[vari].name, var);
+    strcpy(table[vari].value, val);
+    return 0;
+}
+
 int get_command(int history_index)
 {
+    // memset(command, '\0', sizeof(command));
     /* History index is -1, new command incoming */
     if (history_index == -1)
     {
         printf("%s ", prompt);
-        memset(command, '\0', sizeof(command));
         fgets(command, CMD_SIZE, stdin);
     }
-
     else
     {
         /* History index is not -1, append incoming input into an existing command */
         strcpy(command, history[history_index]);
         printf("%s %s", prompt, command);
         char temp_command[CMD_SIZE];
+
+        /* Get additional flags or more commands, append to current one showing on screen */
         fgets(temp_command, CMD_SIZE, stdin);
         strncat(command, temp_command, strlen(temp_command));
     }
 
     int len = strlen(command) - 1;
     command[len] = '\0';
+
+    if (len == 0)
+    {
+        argv[0][0] = NULL;
+        return 0;
+    }
 
     // Is last character arrow?
     if (command[len - 3] == '\033')
@@ -143,7 +215,7 @@ int get_command(int history_index)
         token = strtok (NULL, " ");
     }
 
-    argv[cmds_count][i] = NULL;
+    argv[cmds_count][i] = NULL; 
     return 0;
 }
 
@@ -241,45 +313,98 @@ int change_dir(char* target)
     return chdir(target);
 }
 
-int exec_shell(char** bash_args)
+int read_command(char** args)
 {
-    int res = 1;
+    /* Read each variable from stdin, attach to var names in current command, respectively */
+    char** temp_pointer = args;
+    temp_pointer++; // skip first word ('read')
+    char buff[CMD_SIZE];
+    fgets(buff, CMD_SIZE, stdin);
+    buff[strlen(buff) - 1] = '\0';
 
-    if (strcmp(bash_args[0], "cd") == 0)
-        res = change_dir(bash_args[1]);
+    token = strtok (buff," ");
 
-    return res;
+    /* Terminates once out of variables, or too many variables */
+    while (token != NULL && *temp_pointer != NULL)
+    {
+        add_var(variables, *temp_pointer, token);
+        token = strtok (NULL, " ");
+        temp_pointer++;
+    }
+    return 0;
 }
 
-int shell_command(char* cmd)
+int exec_shell(char** bash_args)
 {
-    int ans = 1;
+    int len = strlen(bash_args[0]);
 
-    if (strcmp(cmd, "cd") == 0)
-        ans = 0;
+    if (strcmp(bash_args[0], "cd") == 0)
+        return change_dir(bash_args[1]);
 
-    return ans;
+    if (prompt_cmd(bash_args))
+        return change_prompt(prompt, bash_args[2]);
+
+    if (len > 1 && bash_args[0][0] == '$')
+        return add_var(variables, ++bash_args[0], bash_args[2]); // ++ to ignore $
+
+    if (strcmp(bash_args[0], "read") == 0)
+        return read_command(bash_args);
+    return 1;
+}
+
+int not_in(char val, char* target)
+{
+    for (int i = 0; i < strlen(target); i++)
+    {
+        if (target[i] == val)
+            return 0;
+    }
+    return 1;
+}
+
+int shell_command(char** cmd)
+{
+    if (strlen(cmd[0]) < 2)
+        return 1;
+
+    if (strcmp(cmd[0], "cd") == 0)
+        return 0;
+
+    if (strcmp(cmd[0], "prompt") == 0)
+        return 0;
+
+    if (strcmp(cmd[0], "read") == 0)
+        return 0;
+
+    if (cmd[0][0] == '$' && cmd [1] != NULL && cmd[1][0] == '=')
+        return 0;
+
+    /* Not shell command, swap $vars with values from table */
+    for (int j = 0; j < cmds_count + 1; j++)
+        swap_variables(argv[j]);
+
+    return 1;
 }
 
 int main() 
 {    
+    /* Initialize local status variable ($?)*/
+    strcpy(variables[0].name, "?");
+    strcpy(variables[0].value, "0");
+    var_table_size = 1;
     while (1)
     {
         get_command(-1);            // Parse commands into argv[], or reload from history.
 
-        if (argv[0] == NULL)        // If empty- skip
+        if (argv[0][0] == NULL)        // If empty- skip
             continue;
 
         if (strcmp(argv[0][0], "quit") == 0)
-            return 0;
-
-        if (prompt_cmd(argv[0]))       // If prompt command - validate and change
         {
-            change_prompt(prompt, argv[0][2]);
-            continue;
+            return 0;
         }
 
-        if (shell_command(argv[0][0]) == 0)
+        if (shell_command(argv[0]) == 0)
         {
             exec_shell(argv[0]);
             continue;
@@ -312,11 +437,17 @@ int main()
             }
             
             execute_cmds();
+            return 0;
         }
 
         /* parent continues here */
         if (amper == 0)
-            retid = wait(&status);
+            {
+                retid = wait(&status);            // Status of last cmd
+                char stat[2];                     // Convert to array of 2 chars, (status and '\0')
+                snprintf(stat, 2, "%d", status);
+                strcpy(variables[0].value, stat); // Save last command status
+            }
     }
 
     return 0;
