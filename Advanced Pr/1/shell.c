@@ -12,6 +12,16 @@
 #define REMEMBER_SIZE 100
 #define VAR_MAX 64
 
+/* State control */
+enum states 
+{
+    NEUTRAL,
+    IF,
+    THEN, 
+    ELSE, 
+    FI
+};
+
 struct local_var_
 {
   char name[64];
@@ -27,8 +37,85 @@ local_var variables[VAR_MAX];
 char history[REMEMBER_SIZE][CMD_SIZE];
 char prompt[PROMPT_LEN] = "hello:";
 
-int i, fd, amper, redirect, redirect_app, 
-err_redirect, retid, status, cmds_count, var_table_size;
+int redirect, redirect_app, curr_state, if_status,
+err_redirect, retid, status, cmds_count, var_table_size, i, fd, amper;
+
+int bak, new; // close and re-open stdout
+char std_fname[] = "delme";
+char if_fname[] = "delme2";
+
+int close_stdout(char* target)
+{
+    fflush(stdout);
+    bak = dup(1);
+    new = open(target, O_WRONLY | O_CREAT, 0660);
+    dup2(new, 1);
+    close(new);
+    return 0;
+}
+
+int open_stdout()
+{
+    fflush(stdout);
+    dup2(bak, 1);
+    close(bak);
+    return 0;
+}
+
+
+int print_file(char* target)
+{
+    int c;
+    FILE *file;
+    file = fopen(target, "r");
+    if (file) 
+    {
+        while ((c = getc(file)) != EOF)
+            putchar(c);
+        fclose(file);
+    }
+}
+
+int file_to_bool(char* target)
+{
+    int c;
+    FILE *file;
+    file = fopen(target, "r");
+    int flag = 0;
+    if (file) 
+    {
+        while ((c = getc(file)) != EOF)
+            putchar(c);
+        flag = flag || c;
+    }
+    return flag;
+}
+
+
+int next_state()
+{
+    switch (curr_state)
+    {
+        case NEUTRAL:
+            curr_state = IF;
+            close_stdout("/dev/null");
+            break;
+        case IF:
+            curr_state = THEN;
+            break;
+        case THEN:
+            curr_state = ELSE;
+            break;
+        case ELSE:
+            open_stdout();
+            print_file(std_fname);
+            remove(std_fname);
+            curr_state = NEUTRAL;
+            break;
+    }
+    return 0;
+}
+
 
 int change_prompt(char* prompt, char* newp)
 {
@@ -46,6 +133,7 @@ int change_prompt(char* prompt, char* newp)
 	return 0;
 }
 
+
 int remember_command()
 {
     // Move previous commands up
@@ -57,6 +145,7 @@ int remember_command()
     // First entry is the newest command.
     strcpy(history[0], command);
 }
+
 
 int temp()
 {
@@ -73,10 +162,12 @@ int temp()
    return 0;
 }
 
+
 char* get_val(int index)
 {
     return variables[index].value;
 }
+
 
 int find_var(local_var* table, char* target)
 {
@@ -90,6 +181,7 @@ int find_var(local_var* table, char* target)
     }
     return -1;
 }
+
 
 int swap_variables(char** args)
 {
@@ -128,9 +220,19 @@ int add_var(local_var* table, char* var, char* val)
     return 0;
 }
 
-int get_command(int history_index)
+
+int starts_with_if(char* cmd)
 {
-    // memset(command, '\0', sizeof(command));
+    if (strlen(cmd) < strlen("if "))
+        return 0;
+    
+    return cmd[0] == 'i' && cmd[1] == 'f' && cmd[2] == ' ';
+}
+
+
+int get_user_cmd(int history_index)
+{
+    memset(command, '\0', sizeof(command));
     /* History index is -1, new command incoming */
     if (history_index == -1)
     {
@@ -179,7 +281,7 @@ int get_command(int history_index)
                     }
             }
 
-            return get_command(history_index);
+            return get_user_cmd(history_index);
     }
 
     // Is !! command?
@@ -195,10 +297,28 @@ int get_command(int history_index)
         temp();
     }
 
+    int prefix = 0;
+    /* check if command starts with if, switch state and update prefix to ignore 'if ' */
+    if (starts_with_if(command) && curr_state == NEUTRAL)
+    {
+        if_status = -1;         // reset status of if command
+        prefix = strlen("if ");
+        next_state();           // adv state to 'IF'
+    }
+
+    /*then, if or else - switch state and skip*/
+    else if ((curr_state == IF && strcmp(command, "then") == 0 ) || 
+               (curr_state == THEN && strcmp(command, "else") == 0) ||
+               (curr_state == ELSE && strcmp(command, "fi") == 0) )
+    {
+        next_state();
+        argv[0][0] = NULL; 
+        return 0;
+    }
     /* parse command line */
     i = 0;
     cmds_count = 0;
-    token = strtok (command," ");
+    token = strtok (command + prefix," ");
     while (token != NULL)
     {
         if (strcmp(token, "|") == 0) // Found |, new command incoming
@@ -215,14 +335,17 @@ int get_command(int history_index)
         token = strtok (NULL, " ");
     }
 
-    argv[cmds_count][i] = NULL; 
+    
+    argv[cmds_count][i] = NULL;
     return 0;
 }
 
-int prompt_cmd(char** arguments)
+
+int is_prompt_cmd(char** arguments)
 {
     return (strcmp(arguments[0], "prompt")) == 0 && (strcmp(arguments[1], "=")) == 0 && i > 2;
 }
+
 
 int create_procces(int inp, int outp, int cmd_index)
 {
@@ -244,6 +367,7 @@ int create_procces(int inp, int outp, int cmd_index)
     return pid;
 }
 
+
 int execute_cmds()
 {
     int i;
@@ -264,6 +388,7 @@ int execute_cmds()
 
     return execvp(argv[i][0], argv[i]);
 }
+
 
 int update_io()
 {
@@ -303,15 +428,19 @@ int update_io()
         err_redirect = 1;
     }
 
-    argv[cmds_count][out_i - 1] = NULL;
+    if (redirect || err_redirect || amper)
+        argv[cmds_count][out_i - 1] = NULL;
+
     outfile = argv[cmds_count][out_i];
     return 0;
 }
+
 
 int change_dir(char* target)
 {
     return chdir(target);
 }
+
 
 int read_command(char** args)
 {
@@ -334,6 +463,7 @@ int read_command(char** args)
     return 0;
 }
 
+
 int exec_shell(char** bash_args)
 {
     int len = strlen(bash_args[0]);
@@ -341,7 +471,7 @@ int exec_shell(char** bash_args)
     if (strcmp(bash_args[0], "cd") == 0)
         return change_dir(bash_args[1]);
 
-    if (prompt_cmd(bash_args))
+    if (is_prompt_cmd(bash_args))
         return change_prompt(prompt, bash_args[2]);
 
     if (len > 1 && bash_args[0][0] == '$')
@@ -351,6 +481,7 @@ int exec_shell(char** bash_args)
         return read_command(bash_args);
     return 1;
 }
+
 
 int not_in(char val, char* target)
 {
@@ -362,7 +493,8 @@ int not_in(char val, char* target)
     return 1;
 }
 
-int shell_command(char** cmd)
+
+int is_shell_cmd(char** cmd)
 {
     if (strlen(cmd[0]) < 2)
         return 1;
@@ -386,16 +518,33 @@ int shell_command(char** cmd)
     return 1;
 }
 
+
+int state_good()
+{
+    /* Then line, but command failed, or else line- but command succeeded*/
+    int good_else = (if_status != 0 && curr_state == ELSE);
+    int good_then = (if_status == 0 && curr_state == THEN);
+    return curr_state == NEUTRAL || good_else || good_then || curr_state == IF;
+}
+
+
 int main() 
 {    
     /* Initialize local status variable ($?)*/
     strcpy(variables[0].name, "?");
     strcpy(variables[0].value, "0");
     var_table_size = 1;
+    curr_state = NEUTRAL;
+    if_status = -1;
+
     while (1)
     {
-        get_command(-1);            // Parse commands into argv[], or reload from history.
-
+        get_user_cmd(-1);            // Parse commands into argv[], or reload from history.
+        if (!state_good())
+            {
+                continue;
+            }
+    
         if (argv[0][0] == NULL)        // If empty- skip
             continue;
 
@@ -404,12 +553,12 @@ int main()
             return 0;
         }
 
-        if (shell_command(argv[0]) == 0)
+        if (is_shell_cmd(argv[0]) == 0)
         {
             exec_shell(argv[0]);
             continue;
         }
-        
+
         /* for commands not part of the shell command language */ 
         update_io();
         if (fork() == 0) 
@@ -435,6 +584,14 @@ int main()
                 dup(fd);
                 close(fd);
             }
+
+            /* if statement, let parent collect output and ignore it */
+            if (curr_state == IF)
+                close_stdout(if_fname);
+
+            /* inside then/else, whatever is running, output to a temporary file */
+            if (curr_state == THEN || curr_state == ELSE)
+                close_stdout(std_fname);
             
             execute_cmds();
             return 0;
@@ -447,6 +604,12 @@ int main()
                 char stat[2];                     // Convert to array of 2 chars, (status and '\0')
                 snprintf(stat, 2, "%d", status);
                 strcpy(variables[0].value, stat); // Save last command status
+
+                if (curr_state == IF)
+                   {
+                        if_status = file_to_bool(if_fname);
+                        remove(if_fname);
+                    }
             }
     }
 
