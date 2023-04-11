@@ -37,7 +37,7 @@ local_var variables[VAR_MAX];
 char history[REMEMBER_SIZE][CMD_SIZE];
 char prompt[PROMPT_LEN] = "hello:";
 
-int redirect, redirect_app, curr_state, if_status,
+int inp, redirect, redirect_app, curr_state, if_status,
 err_redirect, retid, status, cmds_count, var_table_size, i, fd, amper;
 
 int bak, new; // close and re-open stdout
@@ -53,6 +53,7 @@ int close_stdout(char* target)
     close(new);
     return 0;
 }
+
 
 int open_stdout()
 {
@@ -75,6 +76,7 @@ int print_file(char* target)
         fclose(file);
     }
 }
+
 
 int file_to_bool(char* target)
 {
@@ -144,22 +146,6 @@ int remember_command()
 
     // First entry is the newest command.
     strcpy(history[0], command);
-}
-
-
-int temp()
-{
-    FILE *fptr;
-   // use appropriate location if you are using MacOS or Linux
-   fptr = fopen("temp","a+"); // append
-   if(fptr == NULL)
-   {
-      printf("Error!");   
-      exit(1);             
-   }
-   fprintf(fptr,"%s\n",history[0]);
-   fclose(fptr);
-   return 0;
 }
 
 
@@ -233,11 +219,12 @@ int starts_with_if(char* cmd)
 int get_user_cmd(int history_index)
 {
     memset(command, '\0', sizeof(command));
+    char* ret_val;
     /* History index is -1, new command incoming */
     if (history_index == -1)
     {
         printf("%s ", prompt);
-        fgets(command, CMD_SIZE, stdin);
+        ret_val = fgets(command, CMD_SIZE, stdin);
     }
     else
     {
@@ -247,9 +234,12 @@ int get_user_cmd(int history_index)
         char temp_command[CMD_SIZE];
 
         /* Get additional flags or more commands, append to current one showing on screen */
-        fgets(temp_command, CMD_SIZE, stdin);
+        ret_val = fgets(temp_command, CMD_SIZE, stdin);
         strncat(command, temp_command, strlen(temp_command));
     }
+
+    if (ret_val == NULL) // detect ctrl+d
+        exit(0);
 
     int len = strlen(command) - 1;
     command[len] = '\0';
@@ -294,7 +284,6 @@ int get_user_cmd(int history_index)
     if (!(strcmp(command, history[0]) == 0))
     {
         remember_command();
-        temp();
     }
 
     int prefix = 0;
@@ -392,10 +381,11 @@ int execute_cmds()
 
 int update_io()
 {
-    amper = 0;
-    redirect = 0;
-    redirect_app = 0;
-    err_redirect = 0;
+    amper = 0;                // &
+    redirect = 0;              // > 
+    redirect_app = 0;       // >>
+    err_redirect = 0;        // 2>
+    inp = 0;                    // <
 
     if (i < 2)
         return 0;      // Is command long enough to have an & command
@@ -428,7 +418,12 @@ int update_io()
         err_redirect = 1;
     }
 
-    if (redirect || err_redirect || amper)
+    if (strcmp(argv[cmds_count][out_i - 1], "<") == 0)
+    {
+        inp = 1;
+    }
+
+    if (redirect || err_redirect || amper || inp)
         argv[cmds_count][out_i - 1] = NULL;
 
     outfile = argv[cmds_count][out_i];
@@ -534,8 +529,13 @@ int main()
     strcpy(variables[0].name, "?");
     strcpy(variables[0].value, "0");
     var_table_size = 1;
+
+    /* Initialize if control to neutral*/
     curr_state = NEUTRAL;
     if_status = -1;
+
+    /* Ignore ctrl C */
+    signal(SIGINT, SIG_IGN);
 
     while (1)
     {
@@ -581,6 +581,15 @@ int main()
             {
                 fd = creat(outfile, 0660);
                 close(STDERR_FILENO);
+                dup(fd);
+                close(fd);
+            }
+
+            /* input redirect? */
+            if (inp)
+            {
+                fd = open(outfile, O_RDONLY, 0);
+                close(STDIN_FILENO);
                 dup(fd);
                 close(fd);
             }
