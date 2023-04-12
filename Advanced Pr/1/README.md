@@ -1,4 +1,4 @@
--SHELL IMPLEMENTATION IN-
+-SHELL IMPLEMENTATION IN C-
 
 📎 Execute commands (ls, whereis, man)<br>
 📎 Set and read local variables<br>
