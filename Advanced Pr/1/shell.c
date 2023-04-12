@@ -41,11 +41,14 @@ int inp, redirect, redirect_app, curr_state, if_status,
 err_redirect, retid, status, cmds_count, var_table_size, i, fd, amper;
 
 int bak, new; // close and re-open stdout
+
+/*If block is executed line by line, the output will be stored in temporary files and will be removed after the block is finished*/
 char std_fname[] = "delme";
 char if_fname[] = "delme2";
 
 int close_stdout(char* target)
 {
+    /*Closes stdout and redirects it to a target folder. */
     fflush(stdout);
     bak = dup(1);
     new = open(target, O_WRONLY | O_CREAT, 0660);
@@ -57,6 +60,7 @@ int close_stdout(char* target)
 
 int open_stdout()
 {
+    /*Closes the last folder the stdout was redirected into, reopens stdout. */
     fflush(stdout);
     dup2(bak, 1);
     close(bak);
@@ -66,6 +70,7 @@ int open_stdout()
 
 int print_file(char* target)
 {
+    /*Prints content of a target file*/
     int c;
     FILE *file;
     file = fopen(target, "r");
@@ -80,6 +85,7 @@ int print_file(char* target)
 
 int file_to_bool(char* target)
 {
+    /*Opens file, if a file is empty or has zero values, returns 0*/
     int c;
     FILE *file;
     file = fopen(target, "r");
@@ -87,8 +93,8 @@ int file_to_bool(char* target)
     if (file) 
     {
         while ((c = getc(file)) != EOF)
-            putchar(c);
-        flag = flag || c;
+            flag = flag || c;
+        fclose(file);
     }
     return flag;
 }
@@ -100,7 +106,7 @@ int next_state()
     {
         case NEUTRAL:
             curr_state = IF;
-            close_stdout("/dev/null");
+            close_stdout("/dev/null"); // Ignore parent output (prompt)
             break;
         case IF:
             curr_state = THEN;
@@ -109,8 +115,8 @@ int next_state()
             curr_state = ELSE;
             break;
         case ELSE:
-            open_stdout();
-            print_file(std_fname);
+            open_stdout();              // Finished if block, print output from executed commands
+            print_file(std_fname);    // and open stdout to continue printing prompts and output
             remove(std_fname);
             curr_state = NEUTRAL;
             break;
@@ -171,6 +177,12 @@ int find_var(local_var* table, char* target)
 
 int swap_variables(char** args)
 {
+    /*For each command, swap $var to the value of var, if it exists, e.g
+    read cmd flag
+    ls -l
+    and then run $flag $cmd
+    will execute ls -l
+    */
     int i = 0;
     while (args[i] != NULL)
     {
@@ -191,6 +203,7 @@ int swap_variables(char** args)
 
 int add_var(local_var* table, char* var, char* val)
 {   
+    /*Add a variable to variable table, from read x y cmd, or $x = val*/
     if (var == NULL || val == NULL || var_table_size >= VAR_MAX)
         return 0;
 
@@ -424,7 +437,7 @@ int update_io()
     }
 
     if (redirect || err_redirect || amper || inp)
-        argv[cmds_count][out_i - 1] = NULL;
+        argv[cmds_count][out_i - 1] = NULL; 
 
     outfile = argv[cmds_count][out_i];
     return 0;
@@ -437,7 +450,7 @@ int change_dir(char* target)
 }
 
 
-int read_command(char** args)
+int shell_read_cmd(char** args)
 {
     /* Read each variable from stdin, attach to var names in current command, respectively */
     char** temp_pointer = args;
@@ -473,7 +486,7 @@ int exec_shell(char** bash_args)
         return add_var(variables, ++bash_args[0], bash_args[2]); // ++ to ignore $
 
     if (strcmp(bash_args[0], "read") == 0)
-        return read_command(bash_args);
+        return shell_read_cmd(bash_args);
     return 1;
 }
 
@@ -516,9 +529,12 @@ int is_shell_cmd(char** cmd)
 
 int state_good()
 {
-    /* Then line, but command failed, or else line- but command succeeded*/
-    int good_else = (if_status != 0 && curr_state == ELSE);
-    int good_then = (if_status == 0 && curr_state == THEN);
+    /* States to run a command in:
+    -Then line and command returns non-zero
+    -Else line and the output is zero
+    -Neutral state, just run everything*/
+    int good_else = (if_status == 0 && curr_state == ELSE);
+    int good_then = (if_status != 0 && curr_state == THEN);
     return curr_state == NEUTRAL || good_else || good_then || curr_state == IF;
 }
 
@@ -594,11 +610,11 @@ int main()
                 close(fd);
             }
 
-            /* if statement, let parent collect output and ignore it */
+            /* if statement, let parent convert output to boolean and ignore it */
             if (curr_state == IF)
                 close_stdout(if_fname);
 
-            /* inside then/else, whatever is running, output to a temporary file */
+            /* inside then/else, whatever is running, output to a temporary file, to be read later */
             if (curr_state == THEN || curr_state == ELSE)
                 close_stdout(std_fname);
             
