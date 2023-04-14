@@ -53,3 +53,9 @@ $cmd (performs ls and usual)
 read cmd flags
 ls -l (performs ls with the flag -l)
 ```
+📎 Navigate previous commands by (UP, then ENTER) or (DOWN, then ENTER) append and execute again <br>
+```
+ls
+UP arrow key, enter
+ls -l
+```
