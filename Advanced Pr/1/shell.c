@@ -31,6 +31,7 @@ struct local_var_
 char* token;
 char* outfile;
 
+pid_t pid;
 char* argv[10][10];
 char command[CMD_SIZE];
 local_var variables[VAR_MAX];
@@ -539,6 +540,12 @@ int state_good()
 }
 
 
+void sigintHandler()
+{
+    fflush(stdout);
+}
+
+
 int main() 
 {    
     /* Initialize local status variable ($?)*/
@@ -551,7 +558,7 @@ int main()
     if_status = -1;
 
     /* Ignore ctrl C */
-    signal(SIGINT, SIG_IGN);
+    signal(SIGINT, sigintHandler);
 
     while (1)
     {
@@ -577,7 +584,8 @@ int main()
 
         /* for commands not part of the shell command language */ 
         update_io();
-        if (fork() == 0) 
+        pid = fork();
+        if (pid == 0) 
         { 
             /* redirection of IO ? */
             if (redirect) 
@@ -625,7 +633,7 @@ int main()
         /* parent continues here */
         if (amper == 0)
             {
-                retid = wait(&status);            // Status of last cmd
+                retid = waitpid(pid, &status, 0);            // Status of last cmd
                 char stat[2];                     // Convert to array of 2 chars, (status and '\0')
                 snprintf(stat, 2, "%d", status);
                 strcpy(variables[0].value, stat); // Save last command status
