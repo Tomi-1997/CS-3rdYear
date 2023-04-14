@@ -22,6 +22,8 @@ prompt = good morning:
 📎 Redirect io by typing after the last command <, >>, >, or 2> <br>
 ```
 date > todayis
+cat < todayis
+ls badfilename 2> errormsg
 ```
 📎 Perform certain commands with an IF block, the format is as follows <br>
 - if (cmd)
@@ -51,7 +53,7 @@ fi
 $cmd = ls
 $cmd (performs ls and usual)
 read cmd flags
-ls -l (performs ls with the flag -l)
+$cmd $flags (performs ls with the flag -l)
 ```
 📎 Navigate previous commands by (UP, then ENTER) or (DOWN, then ENTER) append and execute again <br>
 ```
