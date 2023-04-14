@@ -37,10 +37,6 @@ def cv2_open(path:str):
         return pil_open(path)
 
 
-def match(img1, img2):
-    pass
-
-
 def unsafe(i, j):
     return i < 0 or i >= W or j < 0 or j >= H
 
@@ -151,7 +147,7 @@ def image_to_star_doc(img):
 
                 # find group which share around the same brightness around it
                 r = group_size(img, i, j, brt, traveled, 10)
-                print(f'i-{i},j-{j},r-{r}')
+                # print(f'i-{i},j-{j},r-{r}')
 
                 # if it's too big, it might be dirt or clouds
                 if r < R:
@@ -160,11 +156,11 @@ def image_to_star_doc(img):
             traveled[i][j] = True
 
 
-    highlight_stars(im, cords)
-
-    print(len(cords))
-    print(cords)
-    show(im)
+    # highlight_stars(im, cords)
+    #
+    # print(len(cords))
+    # print(cords)
+    # show(im)
     return cords
 
 
@@ -198,8 +194,33 @@ def denoise(fname, show=False):
     return dst
 
 
+def match(img1, img2):
+
+    img1 = denoise(img1)
+    img2 = denoise(img2)
+
+    # Get star doc for both pictures, for each x in star doc, x is a tuple of (x, y, radius, brightness)
+    d1 = image_to_star_doc(img1)
+    d2 = image_to_star_doc(img2)
+
+    # Two brightest stars from first picutre
+    brightest1 = [max(d1, key = lambda x : x[3])]       # Pick max
+    d1.remove(brightest1[0])                            # Remove
+    brightest1.append(max(d1, key = lambda x : x[3]))   # Pick max, again
+
+    # Two brightest stars from the second picture
+    brightest2 = [max(d2, key=lambda x: x[3])]
+    d2.remove(brightest2[0])
+    brightest2.append(max(d2, key=lambda x: x[3]))
+
+    print(brightest1)
+    print(brightest2)
+    pass
+
+
 if __name__ == '__main__':
     fname = 'IMG_3051.HEIC'
-    image = denoise(fname)
-    star_doc = image_to_star_doc(image)
+    match(fname, fname)
+    # image = denoise(fname)
+    # star_doc = image_to_star_doc(image)
     # highlight_stars(image, star_doc)
