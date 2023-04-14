@@ -2,6 +2,7 @@ import copy
 import os
 import cv2
 import math
+import random
 
 import matplotlib.image as image
 import matplotlib.pyplot as plt
@@ -13,8 +14,10 @@ register_heif_opener()
 W = 800
 H = 800
 
-R = 15   # pixel blob size filter
-EPS = 20 # error margin for brightness difference between two pixels.
+R = (W + H) / 100   # pixel blob size filter
+EPS = 50            # error margin for brightness difference between two pixels, to be considered same blob
+MIN_BRT = 270       # min brightness or consider a pixel to be a star
+
 
 def match(img1, img2):
     pass
@@ -26,29 +29,34 @@ def unsafe(i, j):
 
 def group_size(img, i, j, brt, traveled, max_depth):
 
+    ans = 0
+
     # too deep
     if max_depth <= 0:
-        return 0
+        return ans
 
     # out of bounds
     if unsafe(i, j):
-        return 0
+        return ans
 
     # been here
     if traveled[i][j]:
-        return 0
+        return ans
 
     traveled[i][j] = True
+    curr_brt = brightness(img[i][j])
 
     # bright enough to be considered at the same blob, continue exploring
-    curr_brt = brightness(img[i][j])
-    if math.fabs(curr_brt - brt) > EPS:
-        return 0
+    if curr_brt < MIN_BRT and abs(curr_brt - brt) > EPS:
+        return ans
 
-    return 1 + group_size(img, i + 1, j, brt, traveled, max_depth - 1) \
-             + group_size(img, i - 1, j, brt, traveled, max_depth - 1) \
-             + group_size(img, i, j + 1, brt, traveled, max_depth - 1) \
-             + group_size(img, i, j - 1, brt, traveled, max_depth - 1)
+    ans += 1
+    for l in range(i - 1, i + 2):
+        for k in range(j - 1, j + 2):
+            if l == i and j == k: continue
+            ans += group_size(img, l, k, brt, traveled, max_depth - 1)
+
+    return ans
 
 
 def avg_brightness(img):
@@ -83,10 +91,30 @@ def draw_rect(img, cl, pos, size):
             img[x - size][j] = cl
 
 
+def brighter_than_area(img, i, j, brt):
+    sample_size = 6
+    sample_count = 30
+    avg = 0
+    index = 0
+
+    while index < sample_count:
+        ii = random.randint(i - sample_size, i + sample_size)
+        jj = random.randint(j - sample_size, j + sample_size)
+
+        if unsafe(ii, jj) or (ii == i and jj == j):
+            continue
+
+        index += 1
+        avg += brightness(img[ii][jj]) / sample_count
+
+    return brt > max(avg * 1.5, MIN_BRT)
+
+
 def image_to_star_doc(img):
     im = copy.deepcopy(img)
     traveled = []
-    threshold = avg_brightness(img) * 2
+    avgbrt = avg_brightness(img)
+    THRESH = max(avgbrt * 1.5, MIN_BRT)
 
     # mark explored pixels, avoid checking pixels twice
     for i, row in enumerate(im):
@@ -101,19 +129,23 @@ def image_to_star_doc(img):
 
             # search for a bright star
             brt = brightness(pix)
-            if (brt > threshold):
+            if (brt > THRESH and brighter_than_area(img, i, j, brt)):
 
                 # find group which share around the same brightness around it
-                r = group_size(img, i, j, brt, traveled, 20)
+                r = group_size(img, i, j, brt, traveled, 10)
+                print(f'i-{i},j-{j},r-{r}')
 
                 # if it's too big, it might be dirt or clouds
                 if r < R:
-                    cords.append((i, j))
+                    cords.append((i, j, r, brt))
+
+            traveled[i][j] = True
 
 
     highlight_stars(im, cords)
 
     print(len(cords))
+    print(cords)
     show(im)
     return cords
 
@@ -137,6 +169,6 @@ def show(img):
 
 
 if __name__ == '__main__':
-    image = open_local('IMG_3060.HEIC')
+    image = open_local('IMG_3051.HEIC')
     star_doc = image_to_star_doc(image)
     # highlight_stars(image, star_doc)
