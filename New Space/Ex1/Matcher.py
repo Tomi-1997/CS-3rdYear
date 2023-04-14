@@ -3,7 +3,7 @@ import os
 import cv2
 import math
 import random
-
+import numpy as np
 import matplotlib.image as image
 import matplotlib.pyplot as plt
 
@@ -11,12 +11,30 @@ import matplotlib.pyplot as plt
 from pillow_heif import register_heif_opener
 register_heif_opener()
 
-W = 800
-H = 800
+W = 700
+H = 700
 
-R = (W + H) / 40    # pixel blob size filter
-EPS = 100            # error margin for brightness difference between two pixels, to be considered same blob
-MIN_BRT = 270       # min brightness or consider a pixel to be a star
+R = (W + H) / 40     # pixel blob size filter
+EPS = 20             # error margin for brightness difference between two pixels, to be considered same blob
+MIN_BRT = 150        # min brightness or consider a pixel to be a star
+
+
+def pil_open(path:str):
+    img = image.imread(path)
+    img = cv2.resize(img, (W, H))
+    return img
+
+
+def cv2_open(path:str):
+    if path.endswith('.HEIC'):
+        pil_image = pil_open(path)
+        open_cv_image = np.array(pil_image)
+        # Convert RGB to BGR
+        # open_cv_image = open_cv_image[:, :, ::-1].copy()
+        return open_cv_image
+
+    else:
+        return pil_open(path)
 
 
 def match(img1, img2):
@@ -47,14 +65,14 @@ def group_size(img, i, j, brt, traveled, max_depth):
     curr_brt = brightness(img[i][j])
 
     # bright enough to be considered at the same blob, continue exploring
-    if curr_brt < MIN_BRT and abs(curr_brt - brt) > EPS:
+    if curr_brt < MIN_BRT or abs(curr_brt - brt) > EPS:
         return ans
 
     ans += 1
     for l in range(i - 1, i + 2):
         for k in range(j - 1, j + 2):
             if l == i and j == k: continue
-            ans += group_size(img, l, k, brt, traveled, max_depth - 1)
+            ans += group_size(img, l, k, curr_brt, traveled, max_depth - 1)
 
     return ans
 
@@ -63,15 +81,15 @@ def avg_brightness(img):
     size = 0
     brt = 0
     for i, row in enumerate(img):
-        for j, col in enumerate(row):
-            brt += brightness(col)
+        for j, pixel in enumerate(row):
+            brt += brightness(pixel)
             size += 1
 
     return brt / size
 
 
 def brightness(pixel):
-    return 0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 + pixel[2]
+    return 0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2]
 
 
 def draw_rect(img, cl, pos, size):
@@ -92,8 +110,8 @@ def draw_rect(img, cl, pos, size):
 
 
 def brighter_than_area(img, i, j, brt):
-    sample_size = 6
-    sample_count = sample_size * sample_size * 2
+    sample_size = 5
+    sample_count = sample_size * sample_size
     avg = 0
     index = 0
 
@@ -107,14 +125,14 @@ def brighter_than_area(img, i, j, brt):
         index += 1
         avg += brightness(img[ii][jj]) / sample_count
 
-    return brt > max(avg * 1.5, MIN_BRT)
+    return brt > max(avg * 1.25, MIN_BRT)
 
 
 def image_to_star_doc(img):
     im = copy.deepcopy(img)
     traveled = []
     avgbrt = avg_brightness(img)
-    THRESH = max(avgbrt * 1.5, MIN_BRT)
+    THRESH = max(avgbrt * 1, MIN_BRT)
 
     # mark explored pixels, avoid checking pixels twice
     for i, row in enumerate(im):
@@ -168,7 +186,20 @@ def show(img):
     plt.show()
 
 
+def denoise(fname, show=False):
+    img = cv2_open(fname)
+    dst = cv2.fastNlMeansDenoisingColored(img, None, 3, 3, 7, 21)
+
+    if show:
+        plt.subplot(121), plt.imshow(img)
+        plt.subplot(122), plt.imshow(dst)
+        plt.show()
+
+    return dst
+
+
 if __name__ == '__main__':
-    image = open_local('IMG_3051.HEIC')
+    fname = 'IMG_3051.HEIC'
+    image = denoise(fname)
     star_doc = image_to_star_doc(image)
     # highlight_stars(image, star_doc)
