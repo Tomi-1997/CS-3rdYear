@@ -14,8 +14,8 @@ register_heif_opener()
 W = 800
 H = 800
 
-R = (W + H) / 100   # pixel blob size filter
-EPS = 50            # error margin for brightness difference between two pixels, to be considered same blob
+R = (W + H) / 40    # pixel blob size filter
+EPS = 100            # error margin for brightness difference between two pixels, to be considered same blob
 MIN_BRT = 270       # min brightness or consider a pixel to be a star
 
 
@@ -93,7 +93,7 @@ def draw_rect(img, cl, pos, size):
 
 def brighter_than_area(img, i, j, brt):
     sample_size = 6
-    sample_count = 30
+    sample_count = sample_size * sample_size * 2
     avg = 0
     index = 0
 
