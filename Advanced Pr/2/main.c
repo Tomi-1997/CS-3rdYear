@@ -1,14 +1,15 @@
-#include "codec.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include<unistd.h>
+
+#include "codec.h"
 #include "queue.h"
 
-
 #define DATA_SIZE 1024
-#define debug 1
+#define debug 0
 
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -174,14 +175,16 @@ int main(int argc, char *argv[])
 	pthread_t disp;
 	worker* workers;
 	work = createQ();
-	fflush(stdout);
+	
 	char c;
 	int counter = 0;
 	char data[DATA_SIZE];
 	int input_order = 0;
 	FIN_WORK = 0;
+	// setbuf(stdout, NULL);
 
-	thread_num = 2;
+	// CPU Num minus one
+	thread_num = sysconf(_SC_NPROCESSORS_ONLN) - 1;
 	threadpool = malloc( sizeof(pthread_t) * thread_num );
 	
 	if (threadpool == NULL)
@@ -211,8 +214,9 @@ int main(int argc, char *argv[])
 	  data[counter] = c;
 	  counter++;
 
-	  if (counter == DATA_SIZE)
+	  if (counter == DATA_SIZE - 1)
 	  {
+		data[counter] = '\0';
 		/* Create work instance */
 		data_block* current_work = arr_to_work(data, input_order);
 
@@ -237,8 +241,9 @@ int main(int argc, char *argv[])
 	if (counter > 0)
 	{
 		char lastData[counter];
-		lastData[0] = '\0';
+		// lastData[0] = '\0';
 		strncat(lastData, data, counter);
+		lastData[counter] = '\0';
 
 		/* Create work instance */
 		data_block* current_work = arr_to_work(lastData, input_order);
@@ -261,7 +266,12 @@ int main(int argc, char *argv[])
 	dummy.finished = true;
 	for (int i = 0; i < thread_num; i++)
 	{
-		enQ(&work, &dummy);
+		pthread_mutex_lock( &lock );
+		enQ(&work, (void*)&dummy);
+		pthread_cond_signal( &queue_cond );
+		if (debug)
+			puts("Sending dummy");
+		pthread_mutex_unlock( &lock );
 	}
 
 	for (int i = 0; i < thread_num; i++)

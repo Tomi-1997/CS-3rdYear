@@ -1,17 +1,20 @@
-CC= gcc -Wall -g
+CC = gcc -Wall -g -pthread
 LINK = sudo cp libCodec.so /usr/lib
 
 .PHONY: all
-all: task stdinExample
 
-task: codec.h basic_main.c
-	$(CC) -o encoder basic_main.c -L. -l:libCodec.so 
+all: prog
+
+call: clean all
+
+prog:	main.c
+	$(CC) -o prog main.c queue.c -L. -l:libCodec.so 
 	${LINK}
 
-stdinExample:	stdin_main.c
-	$(CC) -o tester stdin_main.c -L. -l:libCodec.so 
+tester: single.c
+	$(CC) -o tester single.c -L. -l:libCodec.so
 	${LINK}
-		
-.PHONY: all clean
+
+.PHONY: all clean call
 clean:
-	-rm encoder tester 
+	-rm prog tester
