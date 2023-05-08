@@ -81,12 +81,11 @@ void* printer(void* workers_)
 
 			if (cw == NULL)
 				{
-					// pthread_mutex_unlock( &lock );
 					continue;
 				}
 
 			/* If a worker finished, and the next output is his work, 
-			print his work, free it and wake up him to keep working. */
+			print his work, free it and wake him up to keep working. */
 			if (cw->finished && cw->order_num == current_output)
 				{
 					matching_order = true;
@@ -112,11 +111,11 @@ void* printer(void* workers_)
 						pthread_cond_signal(&work_cond);
 
 				}
-			// pthread_mutex_unlock( &lock );
 		}
 
-		/*If the finished task is not the right order, reset FIN_WORK, then next task will increment it
-		and the printer will go over all working threads.*/
+		/* If the finished task is not the current relavent work, reset FIN_WORK.
+		There has to be another busy worker, once he finishes and increments it,
+		the printer will go over all working threads.*/
 		pthread_mutex_lock( &lock );
 		if (!matching_order)
 			FIN_WORK = 0;
@@ -182,7 +181,6 @@ void* worker_func(void* worker_)
 		{
 			pthread_mutex_lock( &lock );
 			pthread_cond_wait( &(w->wcond), &lock );
-
 			pthread_mutex_unlock( &lock );
 		}
 	}
@@ -252,11 +250,15 @@ int main(int argc, char *argv[])
 	char data[DATA_SIZE];
 	int input_order = 0;
 	FIN_WORK = 0;
-	// setbuf(stdout, NULL);
 
 	// CPU Num minus one
 	thread_num = sysconf(_SC_NPROCESSORS_ONLN) - 1;
 	threadpool = malloc( sizeof(pthread_t) * thread_num );
+
+	if (debug)
+	{
+		printf("Worker group size - %d", thread_num);
+	}
 	
 	if (threadpool == NULL)
 	{
