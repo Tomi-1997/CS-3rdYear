@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include<unistd.h>
+#include <unistd.h>
 
 #include "codec.h"
 #include "queue.h"
@@ -21,6 +21,7 @@ Queue* work;
 int key;
 int thread_num;
 int FIN_WORK;
+char flag;
 
 
 struct data_block_
@@ -38,7 +39,16 @@ struct worker_
 } typedef worker;
 
 
-void* dispatcher(void* workers_)
+int max(int a, int b)
+{
+	if (a > b)
+		return a;
+	return b;
+}
+
+
+
+void* printer(void* workers_)
 {
 	worker* workers = (worker*)(workers_);
 	int current_output = 0;
@@ -48,37 +58,68 @@ void* dispatcher(void* workers_)
 		pthread_mutex_lock( &lock );
 
 		if (debug)
-			puts("Dispatcher went to sleep");
-
+			puts("printer went to sleep");
+		
 		while (FIN_WORK == 0)
+		{
 			pthread_cond_wait( &work_cond, &lock );
+		}
+
+		pthread_mutex_unlock( &lock );
 
 		if (debug)
-			puts("Dispatcher woke up");
+			puts("printer woke up");
 		
-		/* Find which worker finished */
+		/* Find which worker finished, if we got an alarm but found none- that means a worker with a non-relavent
+		output finished, wait for another signal. */
+		bool matching_order = false; 
 		for (int i = 0; i < thread_num; i++)
 		{
+			// pthread_mutex_lock( &lock );
 			worker* w = &workers[i];
 			data_block* cw = w->current_work;
+
 			if (cw == NULL)
-				continue;
+				{
+					// pthread_mutex_unlock( &lock );
+					continue;
+				}
 
 			/* If a worker finished, and the next output is his work, 
 			print his work, free it and wake up him to keep working. */
 			if (cw->finished && cw->order_num == current_output)
 				{
+					matching_order = true;
 					if (debug)
 						printf("<%d>\n", current_output);
 					current_output++;
-					printf("%s\n", cw->block);
-					// fflush(stdout); \n already flushes
+					printf("%s", cw->block);
+
+					// fflush(stdout);
+
 					w->current_work = NULL;
 					free(cw);
-					FIN_WORK--;
+
+					pthread_mutex_lock( &lock );
+					FIN_WORK = max(FIN_WORK - 1, 0);
+					pthread_mutex_unlock( &lock );
+
+					/* Wake up the specific worker of the current output */
 					pthread_cond_signal(&(w->wcond));
+
+					/* We know atleast one worker is now available for work, wake anyone who isn't working */
+					if (work->size > 0)
+						pthread_cond_signal(&work_cond);
+
 				}
+			// pthread_mutex_unlock( &lock );
 		}
+
+		/*If the finished task is not the right order, reset FIN_WORK, then next task will increment it
+		and the printer will go over all working threads.*/
+		pthread_mutex_lock( &lock );
+		if (!matching_order)
+			FIN_WORK = 0;
 		pthread_mutex_unlock( &lock );
 	}
 	return NULL;
@@ -104,19 +145,27 @@ void* worker_func(void* worker_)
 
 		pthread_mutex_lock( &lock );
 		void* ret = deQ(&work);
+		if (debug)
+			printf("Q length - %d\n", work->size);
 		pthread_mutex_unlock( &lock );
 
 		/* Check if another worker already took job */
-		if (!w) continue;
+		if (ret == NULL) continue;
 		w->current_work = (data_block*) (ret);
 
 		/* Is it a dummy work? then we are finished */
 		if (w->current_work->order_num == -1)
-			return 0;
+			{
+				char ret = 'A';
+				pthread_exit(&ret);
+			}
 			
 		// Do task
 		w->current_work->finished = false;
-		encrypt(w->current_work->block, key);
+		if (flag == 'e')
+			encrypt(w->current_work->block, key);
+		else
+			decrypt(w->current_work->block, key);
 		w->current_work->finished = true;
 
 		// Shout to manager that work is done, sleep until he notices
@@ -125,8 +174,8 @@ void* worker_func(void* worker_)
 		if (debug)
 			puts("work done");
 			
-		pthread_cond_signal( &work_cond );
 		FIN_WORK++;
+		pthread_cond_signal( &work_cond );
 		pthread_mutex_unlock( &lock );
 
 		while (w->current_work != NULL)
@@ -157,22 +206,44 @@ data_block* arr_to_work(char* data, int order)
 }
 
 
+void help()
+{
+	printf("Invalid arguments, usages are:\n");
+	printf("<./prog key flag>, key is an integer, flag is '-e' or '-d', for example:\n");
+	printf("cat original | ./prog 5 -e > encrypted\n");
+	printf("./prog 5 -d < encrypted > decrypted\n");
+}
+
+
 int main(int argc, char *argv[])
 {
-	if (0 && argc != 2)
+	if (argc != 3)
 	{
-	    printf("usage: key < file \n");
-	    printf("!! data more than 1024 char will be ignored !!\n");
+	    help();
 	    return 0;
 	}
 
 	key = atoi(argv[1]);
 
+	if (strlen(argv[2]) != 2)
+	{
+		help();
+		return 0;
+	}
+
+	flag = argv[2][1];
+
+	if (flag != 'd' && flag != 'e')
+	{
+		help();
+		return 0;
+	}
+
 	if (debug)
 		printf("key is %i \n",key);
 
 	pthread_t* threadpool;
-	pthread_t disp;
+	pthread_t printer_;
 	worker* workers;
 	work = createQ();
 	
@@ -207,16 +278,16 @@ int main(int argc, char *argv[])
 		pthread_cond_init(&workers[i].wcond, NULL);
 	}
 	
-	pthread_create( &disp, NULL, &dispatcher, (void*)(workers) );
+	pthread_create( &printer_, NULL, &printer, (void*)(workers) );
 
 	while ((c = getchar()) != EOF)
 	{
 	  data[counter] = c;
 	  counter++;
 
-	  if (counter == DATA_SIZE - 1)
+	  if (counter == DATA_SIZE - 2)
 	  {
-		data[counter] = '\0';
+		data[DATA_SIZE - 1] = '\0';
 		/* Create work instance */
 		data_block* current_work = arr_to_work(data, input_order);
 
@@ -241,7 +312,7 @@ int main(int argc, char *argv[])
 	if (counter > 0)
 	{
 		char lastData[counter];
-		// lastData[0] = '\0';
+		lastData[0] = '\0';
 		strncat(lastData, data, counter);
 		lastData[counter] = '\0';
 

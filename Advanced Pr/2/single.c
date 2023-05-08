@@ -13,7 +13,6 @@ int main(int argc, char *argv[])
 	}
 
 	int key = atoi(argv[1]);
-	printf("key is %i \n",key);
 
 	char c;
 	int counter = 0;
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
 
 	  if (counter == 1024){
 		encrypt(data,key);
-		printf("encripted data: %s\n",data);
+		printf("%s",data);
 		counter = 0;
 	  }
 	}
@@ -39,7 +38,7 @@ int main(int argc, char *argv[])
 		lastData[0] = '\0';
 		strncat(lastData, data, counter);
 		encrypt(lastData,key);
-		printf("encripted data:\n %s\n",lastData);
+		printf("%s",lastData);
 	}
 
 	return 0;

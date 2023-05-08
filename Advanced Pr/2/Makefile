@@ -1,5 +1,4 @@
 CC = gcc -Wall -g -pthread
-LINK = sudo cp libCodec.so /usr/lib
 
 .PHONY: all
 
@@ -8,12 +7,10 @@ all: prog
 call: clean all
 
 prog:	main.c
-	$(CC) -o prog main.c queue.c -L. -l:libCodec.so 
-	${LINK}
+	$(CC) main.c queue.c ./libCodec.so -o prog 
 
 tester: single.c
-	$(CC) -o tester single.c -L. -l:libCodec.so
-	${LINK}
+	$(CC) single.c ./libCodec.so -o tester 
 
 .PHONY: all clean call
 clean:
