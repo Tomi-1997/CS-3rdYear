@@ -10,7 +10,18 @@ MIN_HEIGHT = 0
 ## Altitude to maintain
 LOWER = 10000
 UPPER = 30000
-BUFFER = 2500
+
+## -------------    30,000  -------------
+## ------------- ............  -------------
+## ------------- 30,000 - buffer -------------
+## ------------- ...............  -------------
+## ------------- Balloon should be here --------
+## ------------- ...............  -------------
+## ------------- 10,000 + buffer -------------
+## ------------- ............  -------------
+## -------------    10,000  -------------
+
+BUFFER = 5000
 
 DT = 100 ## 1 DT = 1 Second
 GRAMS = 1
@@ -22,7 +33,7 @@ PAYLOAD_WEIGHT = 300 * GRAMS
 ANTI_FREEZE_AMOUNT = 0.1 * KG
 
 
-# Pygame
+# Pygame constants
 X_SIZE = 600
 Y_SIZE = 300
 size = [X_SIZE, Y_SIZE]
@@ -47,7 +58,7 @@ def main():
     while run:
 
         if iters % 100 == 0: b.log(seconds)
-        if b.height >= 10000 and ascent:           ## Log time to reach 10km
+        if b.height >= 10000 and ascent:
             b.log(seconds)
             ascent = False
 
@@ -62,7 +73,7 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-        draw(screen, b)                            ## Draw limit, buffer zone and baloon
+        draw(screen, b)                            ## Draw limit, buffer zone and balloon
         update(b, seconds)
         pygame.display.flip()
         clock.tick(60)
@@ -91,15 +102,15 @@ class Baloon():
 
 
     def helium_leak(self):
-        self.helium_left = max((self.helium_left - 0.00001 * DT), 0)
+        self.helium_left = max((self.helium_left - 0.00004 * DT), 0)
 
 
     def vent(self):
-        self.helium_left = max(self.helium_left - 0.001 * DT, 0)
+        self.helium_left = max(self.helium_left - 0.02 * DT, 0)
 
 
     def drip(self):
-        self.anti_freeze_left = max(self.anti_freeze_left - 0.01 * DT, 0)
+        self.anti_freeze_left = max(self.anti_freeze_left - 0.05 * DT, 0)
 
 
     def update(self, time):
