@@ -10,7 +10,7 @@ MIN_HEIGHT = 0
 ## Altitude to maintain
 LOWER = 10000
 UPPER = 30000
-BUFFER = 5000
+BUFFER = 2500
 
 DT = 100 ## 1 DT = 1 Second
 GRAMS = 1
@@ -63,7 +63,7 @@ def main():
                 run = False
 
         draw(screen, b)                            ## Draw limit, buffer zone and baloon
-        update(b)
+        update(b, seconds)
         pygame.display.flip()
         clock.tick(60)
 
@@ -80,7 +80,8 @@ class Baloon():
         self.height = 0
         self.anti_freeze_left = ANTI_FREEZE_AMOUNT
         self.weight = self.calc_weight()
-        self.helium_left = self.weight * GRAMS + 2# Enough to lift at start
+        self.helium_left = self.weight * GRAMS + 2 # Enough to lift at start
+        self.lift = 0;
 
 
     def calc_weight(self):
@@ -98,21 +99,26 @@ class Baloon():
 
 
     def drip(self):
-        self.anti_freeze_left = max(self.anti_freeze_left - 0.001 * DT, 0)
+        self.anti_freeze_left = max(self.anti_freeze_left - 0.01 * DT, 0)
 
 
-    def update(self):
+    def update(self, time):
         self.x += random.random() * 0.001 * DT
         self.helium_leak()
         self.weight = self.calc_weight()
         prev_height = self.height
-        self.height += DT * (self.helium_left - self.weight)
 
-        atmo = Atmosphere(self.height)
-        temp = atmo.temperature_in_celsius
-        pressure = atmo.pressure
+        # current_hour = time // 3600
+        # current_hour = current_hour % 24
 
-        rising = self.height - prev_height >= 20
+        lift = (self.helium_left - self.weight)
+        self.height += DT * lift
+
+        # atmo = Atmosphere(self.height)
+        # temp = atmo.temperature_in_celsius
+        # pressure = atmo.pressure[0]
+
+        rising = self.height - prev_height >= 0.01 * DT
         dropping = not rising
 
         if rising and self.height > UPPER - BUFFER:
@@ -165,8 +171,8 @@ def draw(screen, b):
     pygame.draw.circle(surface=screen, color=grey, center=[x, y], radius=1, width=1)
 
 
-def update(b):
-    b.update()
+def update(b, time):
+    b.update(time)
 
 
 def sec_to_time(seconds):
