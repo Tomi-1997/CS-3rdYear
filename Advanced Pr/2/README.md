@@ -3,13 +3,12 @@
 Distributing the workload among several threads, lowering runtime by up to 9x! <br>
 This is the result of running the program on the example.txt: <br>
 ![D](https://github.com/Tomi-1997/CS-3rdYear/blob/main/Advanced%20Pr/2/runtime.png) <br>
-The program consists of three groups: <br>
-⏰ One alarm clock and printer thread<br>
-📝 One input writer thread<br>
-⚒ Several worker threads<br>
+### The program consists of three groups: <br>
+⏰ One alarm clock and printer thread.<br>
+📝 One input writer thread.<br>
+⚒ Several worker threads.<br>
 
-The workflow is as follows :<br>
-
+### The workflow:<br>
 📝 Input writer inserts to queue work with an id corresponding to it's order. <br>
 ⚒ Takes work from queue, begins to proccess it.<br>
 ⚒ Signals that it finished and goes to sleep.<br>
