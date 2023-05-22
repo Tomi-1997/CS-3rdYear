@@ -5,6 +5,32 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+def main():
+    samples = get_data()
+    setup(samples)
+    combinations = [(mem, bet), (lamed, bet), (lamed, mem)]
+
+    decor = '-' * 30
+    print(f'\n{decor} Adaline - regular data only\n')
+    for pair in combinations:
+        A, B = pair
+        print(f'Running {LABELS_NAME[A]} versus {LABELS_NAME[B]}.')
+        curr_samples = [i for i in samples if i.label in pair]
+        run(curr_samples, A, B)
+
+
+    rotated_datapath = DATA_PATH + "rotated\\"
+    samples = load_data(x_per_line=FEATURES_NUM, filepath=rotated_datapath,
+                        separator=SEPARATOR, samples=samples)
+
+    print(f'\n{decor} Adaline - both regular and rotated data\n')
+    for pair in combinations:
+        A, B = pair
+        print(f'Running {LABELS_NAME[A]} versus {LABELS_NAME[B]}.')
+        curr_samples = [i for i in samples if i.label in pair]
+        run(curr_samples, A, B)
+
+
 """
 A Single sample of data is:
 ♫ A list \ vector of features. (Integers, floats)
@@ -30,7 +56,7 @@ bet = 1
 mem = 2
 lamed = 3
 LABELS = [bet, mem, lamed]
-LABELS_NAME = ["-", "bet", "lamed", "mem"]
+LABELS_NAME = ["-", "bet", "mem", "lamed"]
 LABEL_TYPE = int
 
 FEATURES_NUM = 100
@@ -67,6 +93,20 @@ def load_data(x_per_line : int, filepath : str, separator : str, samples : list)
     return samples
 
 
+def get_data():
+    # Prepare data
+    original_datapath = DATA_PATH + "regular\\"
+    samples = []
+    samples = load_data(x_per_line = FEATURES_NUM,
+                        filepath = original_datapath,
+                        separator = SEPARATOR,
+                        samples = samples)
+    for s in samples:
+        assert len(s.x) == FEATURES_NUM
+        assert s.label in LABELS
+    return samples
+
+
 def sigmoid(x):
     z = 500
     cp = np.clip( x, -z, z )  ## Prevent sigmoid overflow
@@ -83,14 +123,14 @@ def backprop(sample, w, b, lr):
     b = b - lr * db
 
 
-def pred(sample, w, b):
+def pred(sample, w, b, A, B):
     f = sample.x @ w + b
     g = sigmoid(f)
     y = A if g.sum() > 0.5 else B  ## Predict A or B
     return y
 
 
-def fit(train, test, w):
+def fit(train, test, w, A, B):
     """Runs adaline on a given train and return number of correct predictions on given test set."""
 
     lr = 0.5
@@ -105,7 +145,7 @@ def fit(train, test, w):
         loss = 0
         iters += 1
         for t in train:
-            y = pred(t, w, b)
+            y = pred(t, w, b, A, B)
             w = w + lr * (t.label - y) * t.x    ## Update weights
             loss += (t.label - y) ** 2          ## If the prediction is correct,
                                                 ## the loss won't increase and W remains the same.
@@ -121,7 +161,7 @@ def fit(train, test, w):
 
     predictions = []
     for s in test:
-        y = pred(s, w, b)
+        y = pred(s, w, b, A, B)
 
         pred_correct = 1 if y == s.label else 0
         predictions.append(pred_correct)
@@ -133,7 +173,9 @@ def avg(l : list):
     return sum(l) / len(l)
 
 
-def run(curr_samples):
+def run(curr_samples, A, B):
+    """Runs five times, each time dividing a fifth of the data to be test. Trains adaline and returns average accuracy
+     and how many iterations until the error converged."""
     w = np.random.rand((FEATURES_NUM))
     runs = 5
     acc = []
@@ -141,12 +183,12 @@ def run(curr_samples):
 
 
     size = len(curr_samples)
-    for i in range(0, size, size // runs): ## Each time take a fifth, or a quarter of the data to be the test.
+    for i in range(0, size, size // runs): ## i = 0, 1/5 * size, 2/5 * size, ...
 
         test = curr_samples[i: i + size // runs]
         train = [i for i in curr_samples if i not in test]
 
-        acc_, conv_ = fit(train, test, w)  ## Document average test accuracy and iterations until convergance.
+        acc_, conv_ = fit(train, test, w, A, B)  ## Document average test accuracy and iterations until convergance.
         acc.append(acc_)
         conv.append(conv_)
 
@@ -161,88 +203,32 @@ def run(curr_samples):
 
 
 def setup(samples):
+    """Showcases some samples together."""
     w = 10
     h = 10
-    fig = plt.figure(figsize=(8, 8))
+
+    figh, figw = 5, 5
+    fig = plt.figure(figsize=(figh, figw))
     columns = 4
     rows = 5
 
+    start = 1
+    end = columns * rows + 1
+    end = min(end, len(samples))
     ax = []
-    for i in range(1, columns * rows + 1):
+    for i in range(start, end):
 
         index = random.randint(0, len(samples))
 
         samp = samples[index]
         img = samp.x
-        lab = LABELS_NAME[samp.label]
         img = img.reshape(w, h)
         ax.append( fig.add_subplot(rows, columns, i) )
-        ax[-1].set_title(lab)
+        plt.axis("off")
         plt.imshow(img)
 
     plt.show()
 
 
 if __name__ == '__main__':
-
-    # Prepare data
-    original_datapath = DATA_PATH + "regular\\"
-    samples = []
-    samples = load_data(x_per_line = FEATURES_NUM, filepath = original_datapath, separator = SEPARATOR, samples = samples)
-
-    decor = '▬' * 10
-    setup(samples)
-    # exit(0)
-
-    print(f'\n{decor} Adaline - regular data only {decor}\n')
-    for s in samples:
-        assert len(s.x) == FEATURES_NUM
-        assert s.label in LABELS
-
-    ### 1st, Beit vs Mem. Run adaline with a copy of only relavent samples.
-    A = mem
-    B = bet
-    print(f'Running mem versus beit.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
-
-
-    ## 2nd, Lamed vs brit.
-    A = lamed
-    B = bet
-    print(f'Running lamed versus beit.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
-
-
-    ## 3rd, Lamed vs mem.
-    A = lamed
-    B = mem
-    print(f'Running lamed versus mem.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
-
-    print(f'\n{decor} Adaline - regular and rotated data {decor}\n')
-    rotated_datapath = DATA_PATH + "rotated\\"
-    samples = load_data(x_per_line=FEATURES_NUM, filepath=rotated_datapath, separator=SEPARATOR, samples=samples)
-
-    ### 1st, Beit vs Mem. Run adaline with a copy of only relavent samples.
-    A = mem
-    B = bet
-    print(f'Running mem versus beit.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
-
-    ## 2nd, Lamed vs brit.
-    A = lamed
-    B = bet
-    print(f'Running lamed versus beit.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
-
-    ## 3rd, Lamed vs mem.
-    A = lamed
-    B = mem
-    print(f'Running lamed versus mem.')
-    curr_samples = [i for i in samples if i.label == A or i.label == B]
-    run(curr_samples)
+    main()
