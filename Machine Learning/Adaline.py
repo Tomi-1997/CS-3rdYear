@@ -5,9 +5,10 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def main():
     samples = get_data()
-    setup(samples)
+    # setup(samples)
     combinations = [(mem, bet), (lamed, bet), (lamed, mem)]
 
     decor = '-' * 30
