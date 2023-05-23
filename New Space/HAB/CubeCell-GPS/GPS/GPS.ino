@@ -44,6 +44,7 @@ void printBuffer(char* text)
 }
 
 
+// Print several lines of text, make sure the last element is NULL
 void printBuffer(char** text) 
 {
   display.setLogBuffer(linesPerScreen, charsPerLine);
