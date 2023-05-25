@@ -35,28 +35,98 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON                  false
 #define LORA_IQ_INVERSION_ON                        false
 
-
 #define RX_TIMEOUT_VALUE                            1000
 #define BUFFER_SIZE                                 30 // Define the payload size here
 
-char txpacket[BUFFER_SIZE];
+
+char txpacket[BUFFER_SIZE];       // Data to transmit
 char rxpacket[BUFFER_SIZE];
-
 static RadioEvents_t RadioEvents;
-
-float txNumber;
+int txNumber;
 bool lora_idle=true;
 
 Air530Class GPS;
 extern SSD1306Wire display;
 
+void VextON(void);
+void VextOFF(void);
+int sens_len(char** sentences);
+void printBuffer(char* text);
+void printBuffer(char** text);
 
-int counter = 0;
+
+void setup() 
+{
+  VextON();
+  Serial.begin(115200);
+  display.init();
+  display.clear();
+  display.display();
+  txNumber=0;
+
+  RadioEvents.TxDone = OnTxDone;
+  RadioEvents.TxTimeout = OnTxTimeout;
+  Radio.Init( &RadioEvents );
+  Radio.SetChannel( RF_FREQUENCY );
+  Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
+                                  LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+                                  LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+                                  true, 0, 0, LORA_IQ_INVERSION_ON, 3000 ); 
+  Radio.SetSyncWord(0x12);
+
+  display.drawString(0, 0, "Starting LoRa!");
+  display.display();
+  GPS.begin();
+}
+
+void loop()
+{
+  if(lora_idle == true)
+  {
+
+    /*Get GPS data*/
+    uint32_t starttime = millis();
+    while( (millis() - starttime) < 1000 )
+    {
+      while (GPS.available() > 0)
+      {
+        GPS.encode(GPS.read());
+      }
+    }
+
+    /* GPS Data --> text to be sent*/
+    txNumber++;
+    int prefixLen = sizeof(int) + strlen("Sending packet #");
+    char iterNum[prefixLen];
+    char* prefix = "Sending packet #";
+    sprintf(iterNum, "%s%d", prefix, txNumber);
+
+    sprintf(txpacket,"%d) Alt - %0.2f", txNumber, GPS.altitude.meters());
+    Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
+
+
+    /* Display data to be sent + iter num */
+    display.clear();
+    display.drawString(0, 0, iterNum);
+    display.drawString(0, 10, txpacket);
+    display.display();
+
+    /* Turn colour to let user know data is sent */
+    turnOnRGB(COLOR_SEND,0); //change rgb color
+    Radio.Send( (uint8_t*)txpacket, strlen(txpacket) ); //send the package out 
+    lora_idle = false;
+
+    delay(2000);
+
+  }
+}
+
 void VextON(void) // OLED ON
 {
   pinMode(Vext,OUTPUT);
   digitalWrite(Vext, LOW);
 }
+
 
 void VextOFF(void) // OLED OFF
 {
@@ -78,6 +148,7 @@ int sens_len(char** sentences)
 
   return ans;
 }
+
 
 void printBuffer(char* text) 
 {
@@ -104,55 +175,13 @@ void printBuffer(char** text)
 }
 
 
-void setup() 
-{
-  VextON();
-  Serial.begin(115200);
-  display.init();
-  display.clear();
-  display.display();
-  txNumber=0;
-
-  RadioEvents.TxDone = OnTxDone;
-  RadioEvents.TxTimeout = OnTxTimeout;
-  Radio.Init( &RadioEvents );
-  Radio.SetChannel( RF_FREQUENCY );
-  Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                                  LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                                  LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                  true, 0, 0, LORA_IQ_INVERSION_ON, 3000 ); 
-  Radio.SetSyncWord(0x12);
-  display.drawString(0, 0, "Starting LoRa!");
-  display.display();
-  GPS.begin();
-  delay(500);
-}
-
-void loop()
-{
-  if(lora_idle == true)
-  {
-    delay(3000);
-    txNumber += 0.01;
-
-
-    sprintf(txpacket,"Alt - %0.2f", GPS.altitude.meters());
-    Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
-
-
-    turnOnRGB(COLOR_SEND,0); //change rgb color
-    Radio.Send( (uint8_t *)txpacket, strlen(txpacket) ); //send the package out 
-    lora_idle = false;
-  }
-}
-
-
 void OnTxDone( void )
 {
   turnOffRGB();
   Serial.println("TX done......");
   lora_idle = true;
 }
+
 
 void OnTxTimeout( void )
 {
