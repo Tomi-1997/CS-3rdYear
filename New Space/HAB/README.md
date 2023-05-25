@@ -7,5 +7,5 @@
 1 ✅ Display <br>
 2 ✅ GPS <br>
 3 🔳 Servo <br>
-4 🔳 Lora <br>
+4 💬 Lora (Works, seems unstable)<br>
 5 🔳 Servo depending on altitude given from GPS <br>
