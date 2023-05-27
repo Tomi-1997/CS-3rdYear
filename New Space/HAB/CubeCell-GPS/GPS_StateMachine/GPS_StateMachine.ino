@@ -14,7 +14,7 @@
 
 #define charsPerLine 30     /*  */
 #define linesPerScreen 5    /* Max lines displayed */
-#define ALT_SIZE 16         /* Previous altitudes to consider */
+#define ALT_SIZE 5         /* Previous altitudes to consider */
 #define GPS_INIT_WINDOW 32  /* Iterations to log gps data, without changing states */
 
 
@@ -31,22 +31,22 @@ void printBuffer(char** text);
 int fracPart(double val, int n);
 
 
-void updateGPS();
+int updateGPS();
 void updateState();
 void PrintState();
 int average(int arr[], int size);
-int my_max(int arr[], int size);
-int my_min(int arr[], int size);
+int my_max(int arr[], int size, int exlude);
+int my_min(int arr[], int size, int exlude);
 
 
 enum States          { Init,   Neutral,   Rising,   Descending};
 char* States_str[] = {"Init", "Neutral", "Rising", "Descending"};
-int ALTS[ALT_SIZE];  /* Log previous altitudes */
-int STATE;           /*  */
-int INIT_GPS = 1;    /* For the first X iterations, just log gps */
-int ITER = 0;       /* Iteration number, for init and debugging */
-int INDEX = 0;      /* Current index for the altitude array */
-
+int ALTS[ALT_SIZE];    /* Log previous altitudes */
+int STATE;             /*  */
+int INIT_GPS = 1;      /* For the first X iterations, just log gps */
+int ITER = 0;          /* Iteration number, for init and debugging */
+int INDEX = 0;         /* Current index for the altitude array */
+int STATE_CHANGE = 0;  /* If state changed, display for a bit longer */
 
 void setup() 
 {
@@ -67,10 +67,10 @@ void loop()
     INIT_GPS = 0;
   }
 
-  updateGPS();
+  int inc = updateGPS(); /* Returns how much to increment (1 if GPS ok, 0 if no GPS) */
   updateState();
   printState();
-  ITER++;
+  ITER = ITER + inc;
   INDEX = (INDEX + 1) % ALT_SIZE;
 }
 
@@ -82,10 +82,16 @@ void printState()
   alt_str[writtenAmount] = '\0';
   char* buff[] = {"---", States_str[STATE], alt_str, "---", NULL};
   printBuffer(buff);
+
+  if (STATE_CHANGE == 1)
+  {
+    delay(2000);
+    STATE_CHANGE = 0;
+  }
 }
 
 
-void updateGPS()
+int updateGPS()
 {
   uint32_t starttime = millis();
   while( (millis() - starttime) < 1000 )
@@ -98,11 +104,12 @@ void updateGPS()
 
   if (!GPS.altitude.isValid())
   {
-    return;
+    return 0;
   }
 
   int curr_alt = (int) GPS.altitude.meters();
   ALTS[INDEX] = curr_alt;
+  return 1;
 }
 
 
@@ -111,15 +118,21 @@ void updateState()
   if (INIT_GPS == 1)
     return;
 
+  int prevState = STATE;
   int curr_alt = ALTS[INDEX];
-  if (curr_alt > my_max(ALTS, ALT_SIZE))
+  if (curr_alt > my_max(ALTS, ALT_SIZE, INDEX))
     STATE = Rising;
   
-  else if (curr_alt < my_min(ALTS, ALT_SIZE))
+  else if (curr_alt < my_min(ALTS, ALT_SIZE, INDEX))
     STATE = Descending;
 
   else
     STATE = Neutral;  
+
+  if (prevState != STATE)
+  {
+    STATE_CHANGE = 1;
+  }
 }
 
 
@@ -180,28 +193,28 @@ int fracPart(double val, int n)
 }
 
 
-int my_max(int arr[], int size)
+int my_max(int arr[], int size, int exlude)
 {
   if (size == 0)
     return -1;
   int ans = arr[1];
   for (int i = 1; i < size; i++)
   {
-    if (arr[i] > ans)
+    if (i != INDEX && arr[i] > ans)
       ans = arr[i];
   }
   return ans;
 }
 
 
-int my_min(int arr[], int size)
+int my_min(int arr[], int size, int exlude)
 {
   if (size == 0)
     return -1;
   int ans = arr[1];
   for (int i = 1; i < size; i++)
   {
-    if (arr[i] < ans)
+    if (i != INDEX && arr[i] < ans)
       ans = arr[i];
   }
   return ans;
