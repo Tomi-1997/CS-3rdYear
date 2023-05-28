@@ -17,7 +17,7 @@
 #define LoraWan_RGB 0
 #endif
 
-#define RF_FREQUENCY                                915000000 // Hz
+#define RF_FREQUENCY                                433000000  // Hz
 
 #define TX_OUTPUT_POWER                             14        // dBm
 
@@ -25,8 +25,8 @@
                                                               //  1: 250 kHz,
                                                               //  2: 500 kHz,
                                                               //  3: Reserved]
-#define LORA_SPREADING_FACTOR                       10         // [SF7..SF12]
-#define LORA_CODINGRATE                             1         // [1: 4/5,
+#define LORA_SPREADING_FACTOR                       8         // [SF7..SF12]
+#define LORA_CODINGRATE                             4         // [1: 4/5,
                                                               //  2: 4/6,
                                                               //  3: 4/7,
                                                               //  4: 4/8]
@@ -36,24 +36,19 @@
 #define LORA_IQ_INVERSION_ON                        false
 
 #define RX_TIMEOUT_VALUE                            1000
-#define BUFFER_SIZE                                 30 // Define the payload size here
-
+#define BUFFER_SIZE                                 30        // Payload size
 
 char txpacket[BUFFER_SIZE];       // Data to transmit
-char rxpacket[BUFFER_SIZE];
+char rxpacket[BUFFER_SIZE];       // Data to receive (unused here)
 static RadioEvents_t RadioEvents;
-int txNumber;
-bool lora_idle=true;
+int txNumber = 0;
+bool lora_idle = true;
 
 Air530Class GPS;
 extern SSD1306Wire display;
 
 void VextON(void);
 void VextOFF(void);
-int sens_len(char** sentences);
-void printBuffer(char* text);
-void printBuffer(char** text);
-
 
 void setup() 
 {
@@ -79,44 +74,22 @@ void setup()
   GPS.begin();
 }
 
+
 void loop()
 {
   if(lora_idle == true)
   {
-
-    /*Get GPS data*/
-    uint32_t starttime = millis();
-    while( (millis() - starttime) < 1000 )
-    {
-      while (GPS.available() > 0)
-      {
-        GPS.encode(GPS.read());
-      }
-    }
-
-    /* GPS Data --> text to be sent*/
     txNumber++;
-    int prefixLen = sizeof(int) + strlen("Sending packet #");
-    char iterNum[prefixLen];
-    char* prefix = "Sending packet #";
-    sprintf(iterNum, "%s%d", prefix, txNumber);
-
-    sprintf(txpacket,"%d) Alt - %0.2f", txNumber, GPS.altitude.meters());
+    /*Prepare package*/
+    sprintf(txpacket, "Hi! package #%d", txNumber);
     Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
 
-
-    /* Display data to be sent + iter num */
-    display.clear();
-    display.drawString(0, 0, iterNum);
-    display.drawString(0, 10, txpacket);
-    display.display();
-
     /* Turn colour to let user know data is sent */
-    turnOnRGB(COLOR_SEND,0); //change rgb color
-    Radio.Send( (uint8_t*)txpacket, strlen(txpacket) ); //send the package out 
+    turnOnRGB(COLOR_SEND,0);
+    Radio.Send( (uint8_t*)txpacket, strlen(txpacket) );
     lora_idle = false;
 
-    delay(2000);
+    delay(5000);
 
   }
 }
@@ -132,46 +105,6 @@ void VextOFF(void) // OLED OFF
 {
   pinMode(Vext,OUTPUT);
   digitalWrite(Vext, HIGH);
-}
-
-
-int sens_len(char** sentences)
-{
-  int ans = 0;
-  char** temp = sentences;
-
-  while(*temp != NULL)
-  {
-    temp++;
-    ans++;
-  }
-
-  return ans;
-}
-
-
-void printBuffer(char* text) 
-{
-  char* buff[] = {"---", text, "---"};
-  printBuffer(buff);
-}
-
-
-// Print several lines of text, make sure the last element is NULL
-void printBuffer(char** text) 
-{
-  display.setLogBuffer(linesPerScreen, charsPerLine);
-  for (uint8_t i = 0; i < sens_len(text); i++) 
-  {
-    display.clear();
-    // Print to the screen
-    display.println(text[i]);
-    // Draw it to the internal screen buffer
-    display.drawLogBuffer(0, 0);
-    // Display it on the screen
-    display.display();
-    delay(1000);
-  }
 }
 
 
