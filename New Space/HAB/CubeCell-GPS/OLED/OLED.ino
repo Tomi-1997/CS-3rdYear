@@ -1,3 +1,7 @@
+/*
+Draws several lines on the OLED screen.
+Scrolls down if there are too many lines.
+*/
 #include <Wire.h>  
 #include "HT_SSD1306Wire.h"
 
@@ -7,12 +11,44 @@
 SSD1306Wire display(0x3c, 500000, SDA,
                     SCL, GEOMETRY_128_64, GPIO10); // addr , freq , SDA, SCL, resolution , rst
 
+void VextON(void);
+void VextOFF(void);
+int wordsCount(char** sentence);
+void printBuffer(char* text);
+void printBuffer(char** text);
+
+void setup() 
+{
+  VextON();
+  delay(100);
+
+  display.init();
+  display.clear();
+  display.display();
+}
+
+
+void loop()
+{
+  char* test1[] = {"this is the", "first sentence", "that I am", "currently testing", "allowing",
+  "multiple lines", "per text", NULL};
+  printBuffer(test1);
+  delay(2000);
+
+
+  char* test2[] = {"this is the", "second sentence", "that I am", "currently testing", "allowing",
+  "multiple lines", "per text", NULL};
+  printBuffer(test2);
+  delay(2000);
+}
+
 
 void VextON(void)
 {
   pinMode(Vext,OUTPUT);
   digitalWrite(Vext, LOW);
 }
+
 
 void VextOFF(void) //Vext default OFF
 {
@@ -21,7 +57,7 @@ void VextOFF(void) //Vext default OFF
 }
 
 
-int sens_len(char** sentences)
+int wordsCount(char** sentences)
 {
   int ans = 0;
   char** temp = sentences;
@@ -46,23 +82,7 @@ void printBuffer(char** text)
 {
 
   display.setLogBuffer(linesPerScreen, charsPerLine);
-
-  // // Some test data
-  // const char* test[] = {
-  //     "Hello",
-  //     "World" ,
-  //     "----",
-  //     "Show off",
-  //     "how",
-  //     "the log buffer",
-  //     "is",
-  //     "working.",
-  //     "Even",
-  //     "scrolling is",
-  //     "working"
-  // };
-
-  for (uint8_t i = 0; i < sens_len(text); i++) 
+  for (uint8_t i = 0; i < wordsCount(text); i++) 
   {
     display.clear();
     // Print to the screen
@@ -73,29 +93,4 @@ void printBuffer(char** text)
     display.display();
     delay(1000);
   }
-}
-
-
-void setup() 
-{
-  VextON();
-  delay(100);
-
-  display.init();
-  display.clear();
-  display.display();
-}
-
-void loop()
-{
-  char* test1[] = {"this is the", "first sentence", "that I am", "currently testing", "allowing",
-  "multiple lines", "per text", NULL};
-  printBuffer(test1);
-  delay(2000);
-
-
-  char* test2[] = {"this is the", "second sentence", "that I am", "currently testing", "allowing",
-  "multiple lines", "per text", NULL};
-  printBuffer(test2);
-  delay(2000);
 }
