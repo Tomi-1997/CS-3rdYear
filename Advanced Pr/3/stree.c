@@ -1,7 +1,7 @@
 /* 
 Stree- uses nftw() to build a tree of the current file tree,
 then prints information about each file.
-Might be inefficient as it passes the whole file tree twice.
+Not that efficient as it passes the whole file tree twice.
 */
 
 #define _XOPEN_SOURCE 600 /* Get nftw() */
@@ -23,11 +23,11 @@ Might be inefficient as it passes the whole file tree twice.
 typedef struct Node_
 {
     int level;
-    char pathname[PATH_MAX];           /* Could be malloc'd instead */
-    struct Node_* children[CHILD_MAX]; /* Could be turned into a linked list */
-    char prefix[PREFIX_MAX];
     int children_size;
     struct Node_* prev;
+    char prefix[PREFIX_MAX];
+    char pathname[PATH_MAX];           /* Could be malloc'd instead */
+    struct Node_* children[CHILD_MAX]; /* Could be turned into a linked list */
 } Node;
 
 
@@ -60,22 +60,26 @@ int main(int argc, char* argv[])
     int flags = 0;
     if (argc > 2) 
     {
-        fprintf(stderr, "Usage: ./%s directory-path\n pr ./%s", argv[0], argv[0]);
+        fprintf(stderr, "Usage: %s directory-path, for example:\n%s ..\n%s\n", argv[0], argv[0], argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    /* Is there a no argument? then take current folder as the argument */
+    /* No arg - take current folder */
     char* arg = (argc == 1) ? "." : argv[1]; 
 
-
+    /* Pass all files and create tree */
     if (nftw(arg, treeify, 10, flags) == -1) 
     {
         perror("ftw");
         exit(EXIT_FAILURE);
     }
 
+    /* Print tree */
     climb_(tree.root);
+
+    /* Delete tree */
     chop(tree.root);
+    
     /* DIRS - 1: Subtract one unless you want to count root folder in the counter */
     printf("%ld directories, %ld files\n", (DIRS - 1), FILES);
     return EXIT_SUCCESS;
@@ -106,8 +110,21 @@ void print_stats(Node* file)
 
     char permissions[10];
 
-    /* Folder or file */
-    permissions[0] = (S_ISDIR(st.st_mode))  ? 'd' : '-';
+    char file_type = '-';
+    /* File type (directory, socket, etc) */
+    switch (st.st_mode & S_IFMT) 
+    {
+        case S_IFREG:  file_type = '-'; break;
+        case S_IFDIR:  file_type = 'd'; break;
+        case S_IFCHR:  file_type = 'c'; break;
+        case S_IFBLK:  file_type = 'b'; break;
+        case S_IFLNK:  file_type = 'l'; break;
+        case S_IFIFO:  file_type = 'p'; break;
+        case S_IFSOCK: file_type = 's'; break;
+        default:       file_type = '?'; break; /* Should never happen (on Linux) */
+    }
+
+    permissions[0] = file_type;
 
     /* User/Owner permissions */
     permissions[1] = (st.st_mode & S_IRUSR) ? 'r' : '-';
@@ -145,11 +162,13 @@ void climb_(Node* root)
     }
 }
 
-
+/* Returns only the name from the full path
+   Input: /user/program/file -> file
+   */
 char* path_to_name(char* path)
 {
     int i = strlen(path) - 1;
-    while (path[i] != '/')
+    while (path[i] != '/' && i >= 0)
     {
         i--;
     }
@@ -187,6 +206,7 @@ void climb(Node* curr, int last)
 }
 
 
+/* Returns Node* object from tree by given full path */
 Node* from_path(const char* pathname, Node* curr)
 {    
     if (curr == NULL)
