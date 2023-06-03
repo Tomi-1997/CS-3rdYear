@@ -13,7 +13,8 @@ Might be inefficient as it passes the whole file tree twice.
 #include <unistd.h>       /* Prototypes for many system calls */
 #include <errno.h>        /* Declares errno and defines error constants */
 #include <string.h>       /* Commonly used string-handling functions */
-
+#include <pwd.h>
+#include <grp.h>
 
 #define CHILD_MAX 16
 #define PATH_MAX 128
@@ -36,9 +37,12 @@ typedef struct Tree_
     int size;
 } Tree;
 
+/* Use ftw to build tree */
 int treeify(const char* pathname, const struct stat* sbuf, int type, struct FTW* ftwb);
-void climb_(Node* root);
+void climb_(Node* root);            /* Print */
 void climb(Node* curr, int last);
+void chop(Node* root);              /* Delete */
+void print_stats(Node* file);
 
 char* LAST_SIGN = "└── ";
 char* MID_SIGN = "├── ";
@@ -71,17 +75,72 @@ int main(int argc, char* argv[])
     }
 
     climb_(tree.root);
+    chop(tree.root);
+    /* DIRS - 1: Subtract one unless you want to count root folder in the counter */
+    printf("%ld directories, %ld files\n", (DIRS - 1), FILES);
     return EXIT_SUCCESS;
+}
+
+
+void chop(Node* root)
+{
+    if (root == NULL)
+        return;
+
+    for (int i = 0; i < root->children_size; i++)
+    {
+        chop(root->children[i]);
+    }
+    free(root);
+}
+
+
+void print_stats(Node* file)
+{
+    struct stat st;
+    if (stat(file->pathname, &st) != 0) 
+    {
+        perror(file->pathname);
+        exit(1);
+    }
+
+    char permissions[10];
+
+    /* Folder or file */
+    permissions[0] = (S_ISDIR(st.st_mode))  ? 'd' : '-';
+
+    /* User/Owner permissions */
+    permissions[1] = (st.st_mode & S_IRUSR) ? 'r' : '-';
+    permissions[2] = (st.st_mode & S_IWUSR) ? 'w' : '-';
+    permissions[3] = (st.st_mode & S_IXUSR) ? 'x' : '-';
+
+    /* Group permissions */
+    permissions[4] = (st.st_mode & S_IRGRP) ? 'r' : '-';
+    permissions[5] = (st.st_mode & S_IWGRP) ? 'w' : '-';
+    permissions[6] = (st.st_mode & S_IXGRP) ? 'x' : '-';
+
+    /* Not owner or group, other*/
+    permissions[7] = (st.st_mode & S_IROTH) ? 'r' : '-';
+    permissions[8] = (st.st_mode & S_IWOTH) ? 'w' : '-';
+    permissions[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
+
+    /* User name*/
+    struct passwd* pw = getpwuid(st.st_uid);
+    /* Group name*/
+    struct group* gr = getgrgid(st.st_gid);
+
+    printf(" [%s %s  %s        %ld]", permissions,  gr->gr_name, pw->pw_name, st.st_size);
 }
 
 
 void climb_(Node* root)
 {
+    if (root == NULL)
+        return;
     printf("%s\n", root->pathname);
     for (int i = 0; i < root->children_size; i++)
     {
         int is_last = (i == root->children_size -1);
-        // strcpy(root->children[i]->prefix, "│   ");
         climb(root->children[i], is_last? 1 : 0);
     }
 }
@@ -105,6 +164,8 @@ void climb(Node* curr, int last)
 
     printf("%s", curr->prev == tree.root? "" : curr->prefix);
     printf("%s", last? LAST_SIGN : MID_SIGN); 
+
+    print_stats(curr); // [permissions group user size]
     printf(" %s\n", path_to_name(curr->pathname));
 
     int len = curr->children_size;
@@ -166,17 +227,33 @@ Node* get_parent(const char* pathname)
 
 int treeify(const char* pathname, const struct stat* sbuf, int type, struct FTW* ftwb)
 {    
+    /* Increment folder or directory counter */
+    if (S_ISDIR(sbuf->st_mode))
+        DIRS++;
+    else
+        FILES++;
+
     /* Initialize a new node with NULL children */
     Node* current = (Node*) (malloc(sizeof(Node)));
-    strcpy(current->pathname, pathname);
+    if (current == NULL)
+    {
+        printf("Malloc() error at treeify");
+        return EXIT_FAILURE;
+    }
+
+    /* Initialize node's variables */
+    current->prev = NULL;
+    current->children_size = 0;
     current->level = ftwb->level;
+    strcpy(current->pathname, pathname);
+    memset(current->prefix, '\0', sizeof(current->prefix));
     for (int i = 0; i < CHILD_MAX; i++)
         current->children[i] = NULL;
+
 
     /* Root */
     if (ftwb->level == 0)
     {
-        current->prev = NULL;
         tree.root = current;
     }
     /* Not root, find parent by complete pathname and add new node to parent's child list.*/
