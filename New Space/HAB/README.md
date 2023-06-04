@@ -5,7 +5,9 @@
 💬 - in progress<br>
 
 1 ✅ Display <br>
-2 ✅ GPS <br>
-3 ✅ Servo <br>
-4 ✅ Send data from CubeCell to Wireless Stick via Lora<br>
-5 🔳 Servo depending on altitude given from GPS <br>
+2 ✅ LoRa <br>
+3 ✅ GPS <br>
+4 ✅ Servo <br>
+5 ✅ Send data from CubeCell to Wireless Stick via Lora <br>
+6 🔳 Battery drainer <br>
+7 🔳 State machine- calcualte ascent rate <br>
