@@ -4,12 +4,14 @@ char TX_PACKET[BUFFER_SIZE];      /* Packet to send */
 static RadioEvents_t RadioEvents; /*   */
 bool LORA_IDLE = true;            /*   */
 
+const int SEC_1 = 1000;
+
 Air530Class GPS;
 Servo SERVO;
 int SERVO_POS = 0;
 int CONSECUTIVE_DANGER;
 
-int ALTS[ALT_MEMORY_SIZE];        /* Rembmer altitude of past few minutes */
+int ALTS[ALT_MEMORY_SIZE]; /* Remember altitude of past few minutes */
 enum STATES { INITIAL_ASCENT,
               FLOATING,
               DANGER,
@@ -35,8 +37,7 @@ void log_altitude();
 
 
 enum STATES State = INITIAL_ASCENT;
-void setup() 
-{
+void setup() {
   VextON();
 
   /* Serial Init */
@@ -62,14 +63,13 @@ void setup()
 }
 
 
-void loop() 
-{
-  updateGPS();
-  log_altitude();
+void loop() {
+  smart_delay(30 * SEC_1);  //every 30 secs
+  // updateGPS(); //updates on smart delay
+  log_altitude(); //pass to smart delay?
   preparePacket();
   sendPacket();
-  switch (State) 
-  {
+  switch (State) {
     case INITIAL_ASCENT:
       {
         //
@@ -87,13 +87,9 @@ void loop()
     case DANGER:
       {
         //add to danger counter
-        CONSECUTIVE_DANGER++; 
-        if (CONSECUTIVE_DANGER > MAX_DANGER_ITERS) 
-        {
-          //if danger-counter > 3: verify servo
+        CONSECUTIVE_DANGER++;
+        if (CONSECUTIVE_DANGER > MAX_DANGER_ITERS)
           verify_system();
-        }
-        
         //dribble func
         dribble();
         State = STANDBY;
@@ -103,48 +99,39 @@ void loop()
 
     case STANDBY:
       {
-        WAIT_ITERS--;
-        if (WAIT_ITERS == 0)
-        {
-          State = is_descending()? DANGER : FLOATING;
-        }
+        smart_delay(WAIT_ITERS * SEC_1);
+        State = is_descending() ? DANGER : FLOATING;
         break;
       }
   }
-  
+}
+// void updateGPS() {
+//   uint32_t starttime = millis();
+//   while ((millis() - starttime) < 1000) {
+//     while (GPS.available() > 0) {
+//       GPS.encode(GPS.read());
+//     }
+//   }
+// }
+
+bool is_descending() {
+  return false;
+}
+
+void log_altitude() {
 }
 
 
-void updateGPS() 
-{
-  uint32_t starttime = millis();
-  while ((millis() - starttime) < 1000) {
-    while (GPS.available() > 0) {
-      GPS.encode(GPS.read());
-    }
-  }
-}
-
-
-void log_altitude()
-{
-
-}
-
-
-void dribble() 
-{
+void dribble() {
   activateServo(90);
 }
 
 
-void verify_system() 
-{
+void verify_system() {
 }
 
 
-void preparePacket() 
-{
+void preparePacket() {
   /* Prepare largest packet of gps info */
   int index = 0;
   if (GPS.date.isValid())
@@ -162,8 +149,7 @@ void preparePacket()
 }
 
 
-void sendPacket() 
-{
+void sendPacket() {
   /* Increment packets transmitted */
   txNumber++;
 
@@ -174,47 +160,42 @@ void sendPacket()
 }
 
 
-void activateServo(int degrees) 
-{
+void activateServo(int degrees) {
   /* Open */
   for (SERVO_POS = 0; SERVO_POS <= degrees; SERVO_POS += 1) {
     SERVO.write(SERVO_POS);
-    delay(30);
+    smart_delay(30);
   }
-  delay(500);
+  smart_delay(SEC_1);  //hold a sec
   /* Close */
   for (SERVO_POS = degrees; SERVO_POS >= 0; SERVO_POS -= 1) {
     SERVO.write(SERVO_POS);
-    delay(30);
+    smart_delay(30);
   }
 }
 
 
 
-void VextON(void) 
-{
+void VextON(void) {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
 }
 
 
-void VextOFF(void) 
-{
+void VextOFF(void) {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, HIGH);
 }
 
-void OnTxDone(void) 
-{
+void OnTxDone(void) {
   turnOffRGB();
   Serial.println("TX done......");
   lora_idle = true;
-  delay(10000);
+  smart_delay(10 * SEC_1);
 }
 
 
-void OnTxTimeout(void) 
-{
+void OnTxTimeout(void) {
   turnOffRGB();
   Radio.Sleep();
   Serial.println("TX Timeout......");
@@ -222,7 +203,27 @@ void OnTxTimeout(void)
 }
 
 
-int fracPart(double val, int n) 
-{
+int fracPart(double val, int n) {
   return (int)((val - (int)(val)) * pow(10, n));
+}
+
+static void smart_delay(const unsigned long ms) {
+  Serial.println("************* START SMART_DELAY *************");
+  Serial.print("Func: smart_delay() For:\t");
+  Serial.println(ms / SEC_1);
+
+  unsigned long start = millis();
+
+  Serial.print("Secs:\t");
+  Serial.println(start / SEC_1);
+
+  // loop smart delay
+  while (millis() - start < ms && start) {
+
+    // feed gps
+    GPS.encode(GPS.read())
+  }
+  Serial.println("************* END SMART_DELAY *************");
+
+  // smart delay completed. if message arrived, process.
 }
