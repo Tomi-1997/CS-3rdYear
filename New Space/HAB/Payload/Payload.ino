@@ -1,7 +1,8 @@
 #include "Constants.h"
+#define LAUNCH 0
+
 Air530Class GPS;
-Servo SERVO;       /* To be removed  */
-int SERVO_POS = 0; /* To be removed  */
+int PUMP_PIN = 0;
 
 char TX_PACKET[BUFFER_SIZE];      /* Packet to send */
 static RadioEvents_t RadioEvents; /*   */
@@ -14,30 +15,29 @@ int ALTS_POS = 0;
 enum STATES { INITIAL_ASCENT,
               FLOATING,
               DANGER,
-              STANDBY };
+              STANDBY,
+              LIQUID_EMPTY };
 /*
   INITIAL_ASCENT - First ascent, goal is to rise with no conditions.
   FLOATING - Altitude is stable, state of buoyancy, can save power.
   DANGER -   Balloon is descending fast and altitude is low.
-  STANDBY -  On standby after dribble, decide if still in danger or not.
+  STANDBY -  On standby after pumping water, decide if still in danger or not.
 */
 
 
 void VextON(void);
 void VextOFF(void);
-int fracPart(double val, int n);  // unsure if needed
-void updateGPS();               // to be removed
 void preparePacket();
 void sendPacket();
-void activateServo(int degrees); // to be removed?
-void dribble();                  // to be replaced 
-void verify_system();            // removed / replaced
+void pump(int seconds);
 void log_altitude();
 int real_index(int i, int start, int direction);
 double variance(int* array, int start, int steps, int direction);
 double average_();
 double average(int* array, int start, int steps, int direction);
 int at_risk();
+void test_system();
+
 
 enum STATES State = INITIAL_ASCENT;
 void setup() {
@@ -60,27 +60,31 @@ void setup() {
   /* GPS Init */
   GPS.begin();
 
-  /* Servo Init */
-  SERVO.attach(GPIO4);
+  /* Pump Init */
+  pinMode(PUMP_PIN, OUTPUT);
 
   /* Init alt memory */
   for (int i = 0 ; i < ALT_MEMORY_SIZE; i++)
     ALTS[i] = 0;
   
   Serial.println("Payload init");
+
+  if (!LAUNCH)
+  {
+    test_system();
+    while(1) {};
+  }
 }
 
 
 void loop() {
   smart_delay(30 * SEC_1);  //every 30 secs
-  // updateGPS(); //updates on smart delay
-  //log_altitude(); //pass to smart delay? ---> passed to smart delay
   preparePacket();
   sendPacket();
   switch (State) {
     case INITIAL_ASCENT:
       {
-        State = average() < (LOWER_LIM + MARGIN)? INITIAL_ASCENT : FLOATING;
+        State = average_() < (ASCENT_LIM)? INITIAL_ASCENT : FLOATING;
         break;
       }
 
@@ -95,15 +99,17 @@ void loop() {
 
     case DANGER:
       {
-        //add to danger counter
+        /* Count how many times we had to pump in a row- if it's too much, must have ran out of liquid.
+        Switch state to save on power.*/
         CONSECUTIVE_DANGER++;
         if (CONSECUTIVE_DANGER > MAX_DANGER_ITERS)
         {
-          verify_system();
+          State = LIQUID_EMPTY;
+          break;
         }
 
         /* Danger = Going down, get rid of weight */
-        dribble();
+        pump(2 * SEC_1);
 
         /* Wait a bit, check for changes- maybe there is still danger */
         State = STANDBY;
@@ -113,21 +119,18 @@ void loop() {
     case STANDBY:
       {
         /* Wait, then check if still in danger */
-        smart_delay(WAIT_ITERS * SEC_1);
+        smart_delay(STANDBY_WAIT * SEC_1);
         State = at_risk() ? DANGER : FLOATING;
+        break;
+      }
+
+      case LIQUID_EMPTY:
+      {
+        smart_delay(5 * SEC_1);
         break;
       }
   }
 }
-
-// void updateGPS() {
-//   uint32_t starttime = millis();
-//   while ((millis() - starttime) < 1000) {
-//     while (GPS.available() > 0) {
-//       GPS.encode(GPS.read());
-//     }
-//   }
-// }
 
 
 int real_index(int i, int start, int direction)
@@ -234,7 +237,7 @@ int at_risk() {
   int oldest_average = average(ALTS, start - steps, steps, -1);
 
   int descending = latest_average < oldest_average;
-  int below_lim = latest_average < LOWER_LIM;
+  int below_lim = latest_average < LOWER_LIMIT;
 
   return descending && below_lim;
 }
@@ -253,12 +256,10 @@ void log_altitude() {
 }
 
 
-void dribble() {
-  activateServo(90);
-}
-
-
-void verify_system() {
+void pump(int seconds) {
+  digitalWrite(PUMP_PIN, HIGH);   
+  delay(seconds);              
+  digitalWrite(PUMP_PIN, LOW);   
 }
 
 
@@ -283,40 +284,22 @@ void preparePacket() {
     default:             { state_c = '-'; } // Shouldn't really happen
   }
   
-  index += sprintf((txpacket + index), "%c\n", state_c);
-  index += sprintf((txpacket + index), "alt:%d.%d\n", (int)GPS.altitude.meters(), fracPart(GPS.altitude.meters(), 2));
-  index += sprintf((txpacket + index), "hdop:%d.%d\n", (int)GPS.hdop.hdop(), fracPart(GPS.hdop.hdop(), 2));
-  index += sprintf((txpacket + index), "lat :%d.%d\n", (int)GPS.location.lat(), fracPart(GPS.location.lat(), 4));
-  index += sprintf((txpacket + index), "lon:%d.%d\n", (int)GPS.location.lng(), fracPart(GPS.location.lng(), 4));
-  index += sprintf((txpacket + index), "speed: %d.%d km/h\n", (int)GPS.speed.kmph(), fracPart(GPS.speed.kmph(), 3));
-  txpacket[index] = '\0';
+  index += sprintf((TX_PACKET + index), "%c\n", state_c);
+  index += sprintf((TX_PACKET + index), "alt:%d\n", (int)GPS.altitude.meters());
+  index += sprintf((TX_PACKET + index), "hdop:%d\n", (int)GPS.hdop.hdop());
+  index += sprintf((TX_PACKET + index), "lat :%d\n", (int)GPS.location.lat());
+  index += sprintf((TX_PACKET + index), "lon:%d\n", (int)GPS.location.lng());
+  index += sprintf((TX_PACKET + index), "speed: %d km/h\n", (int)GPS.speed.kmph());
+  TX_PACKET[index] = '\0';
 }
 
 
 void sendPacket() {
-  /* Increment packets transmitted */
-  txNumber++;
 
   /* Turn colour to let user know data is sent */
   turnOnRGB(COLOR_SEND, 0);
-  Radio.Send((uint8_t*)txpacket, strlen(txpacket));
+  Radio.Send((uint8_t*)TX_PACKET, strlen(TX_PACKET));
 }
-
-
-void activateServo(int degrees) {
-  /* Open */
-  for (SERVO_POS = 0; SERVO_POS <= degrees; SERVO_POS += 1) {
-    SERVO.write(SERVO_POS);
-    smart_delay(30);
-  }
-  smart_delay(SEC_1);  //hold a sec
-  /* Close */
-  for (SERVO_POS = degrees; SERVO_POS >= 0; SERVO_POS -= 1) {
-    SERVO.write(SERVO_POS);
-    smart_delay(30);
-  }
-}
-
 
 
 void VextON(void) {
@@ -330,10 +313,11 @@ void VextOFF(void) {
   digitalWrite(Vext, HIGH);
 }
 
+
 void OnTxDone(void) {
   turnOffRGB();
-  Serial.println("TX done......");
-  smart_delay(10 * SEC_1);
+  // Serial.println("TX done......");
+  // smart_delay(10 * SEC_1);
 }
 
 
@@ -343,10 +327,6 @@ void OnTxTimeout(void) {
   Serial.println("TX Timeout......");
 }
 
-
-int fracPart(double val, int n) {
-  return (int)((val - (int)(val)) * pow(10, n));
-}
 
 static void smart_delay(const unsigned long ms) 
 {
@@ -363,11 +343,78 @@ static void smart_delay(const unsigned long ms)
   while (millis() - start < ms && start) {
 
     // feed gps
-    GPS.encode(GPS.read())
+    GPS.encode(GPS.read());
     // add gps info to memory
     log_altitude();
   }
   Serial.println("************* END SMART_DELAY *************");
 
   // smart delay completed. if message arrived, process.
+}
+
+
+void assert_(int condition)
+{
+  if (condition)
+    return;
+
+  Serial.println("Assertion failed");
+  while(1) {};
+}
+
+
+void test_system()
+{
+  Serial.println("Testing GPS");
+  smart_delay(10 * SEC_1);
+  assert_(GPS.altitude.isUpdated());
+  assert_(GPS.altitude.meters() > 0);
+
+  Serial.println("Testing LoRa");
+  preparePacket();
+  sendPacket();
+
+  Serial.println("Testing Pump");
+  pump(1);
+  
+  Serial.println("Testing At Risk function");
+
+  /* "Simulate" altitude starting at 6000 and increasing with occasional spikes */
+  ALTS[0] = 6000; 
+  for (int i = 0; i < 1000; i++)
+  {
+    int previous = ALTS[ (ALTS_POS - 1) % ALT_MEMORY_SIZE ];
+    ALTS[ALTS_POS] = previous + (rand() % 20) ;
+    ALTS_POS = (ALTS_POS + 1) % ALT_MEMORY_SIZE;
+  }
+
+  /* Randomly subtract, simulate spikes */
+  for (int i = 0; i < ALT_MEMORY_SIZE; i++)
+  {
+    if (rand() % 5 == 1) ALTS[i] -= 50;
+  }
+
+  Serial.println("Testing incrase in altitude.");
+  assert_(at_risk() == 0);
+
+
+  /* "Simulate" altitude starting at 8000 and descending with occasional positive spikes */
+  ALTS[0] = 8000; 
+  for (int i = 0; i < 500; i++)
+  {
+    int previous = ALTS[ (ALTS_POS - 1) % ALT_MEMORY_SIZE ];
+    ALTS[ALTS_POS] = previous - (rand() % 20) ;
+    ALTS_POS = (ALTS_POS + 1) % ALT_MEMORY_SIZE;
+  }
+
+  /* Randomly subtract, simulate spikes */
+  for (int i = 0; i < ALT_MEMORY_SIZE; i++)
+  {
+    if (rand() % 5 == 1) ALTS[i] += 100;
+  }
+
+  Serial.println("Testing decrease at risky altitude.");
+  assert_(at_risk() == 1);
+
+  Serial.println("Tests OK");
 }
