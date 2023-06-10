@@ -44,10 +44,6 @@ void loop()
       char c = (char)LoRa.read();
       Serial.print(c);
     }
-    Serial.print("\n");
-  }
-  else
-  {
-    delay(1000);
+    Serial.printf("\n--------------------[%d]--------------------\n", packetSize);
   }
 }
