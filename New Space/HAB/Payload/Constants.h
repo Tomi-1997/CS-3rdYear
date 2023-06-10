@@ -9,10 +9,9 @@
 #define ASCENT_LIM        2000     // Until this height, system does nothing. Set to be low to incase GPS won't operate after a certain altitude.
 #define UPPER_LIMIT       10000    // 
 #define LOWER_LIMIT       8000     // 
-#define MARGIN            2000     //
 #define ALT_MEMORY_SIZE   128      //
 #define MAX_DANGER_ITERS  10       // Number of consecutive DANGER states allowed before verifying system components.
-#define BUFFER_SIZE       256      // Payload size
+#define BUFFER_SIZE       100      // Payload size
 #define STANDBY_WAIT      30       // Seconds to wait before checking altitude again. (Done after pumping out water)
 /*
  * set LoraWan_RGB to 1,the RGB active in loraWan
