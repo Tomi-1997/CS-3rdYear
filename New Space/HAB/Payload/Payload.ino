@@ -1,5 +1,5 @@
 #include "Constants.h"
-#define LAUNCH 0
+#define LAUNCH 1
 
 Air530Class GPS;
 int PUMP_PIN = 0;
@@ -10,7 +10,7 @@ const int SEC_1 = 1000;
 int CONSECUTIVE_DANGER;           /* Count consecutive occurences which we are descending and below the required altitude. */
                                   /* If it's large enough maybe the GPS needs a restart or the liquid mechanism is stuck  */
 
-int ALTS[ALT_MEMORY_SIZE]; /* Remember past altitudes, make decision based on it */
+int ALTS[ALT_MEMORY_SIZE];        /* Remember past altitudes, make decision based on it */
 int ALTS_POS = 0;
 enum STATES { INITIAL_ASCENT,
               FLOATING,
@@ -37,6 +37,7 @@ double average_();
 double average(int* array, int start, int steps, int direction);
 int at_risk();
 void test_system();
+int fracPart(double val, int n);
 
 
 enum STATES State = INITIAL_ASCENT;
@@ -264,15 +265,7 @@ void pump(int seconds) {
 
 
 void preparePacket() {
-  /* Prepare packet to send to ground station, consisting of current state, and GPS info */
-
-  // Not sure if date and time are neccessary
-  // if (GPS.date.isValid())
-  //   index += sprintf((txpacket + index), "%d/%02d/%02d\n", GPS.date.year(), GPS.date.day(), GPS.date.month());
-
-  // if (GPS.time.isValid())
-  //   index += sprintf((txpacket + index), "%02d:%02d:%02d.%02d\n", GPS.time.hour(), GPS.time.minute(), GPS.time.second(), GPS.time.centisecond());
-  
+  /* Prepare packet to send to ground station, consisting of current state, and GPS info */  
   int index = 0;
   char state_c;
   switch (State)
@@ -281,15 +274,17 @@ void preparePacket() {
     case FLOATING:       { state_c = 'F'; break; }
     case DANGER:         { state_c = 'D'; break; }
     case STANDBY:        { state_c = 'S'; break; }
+    case LIQUID_EMPTY:   { state_c = 'E'; break; }
     default:             { state_c = '-'; } // Shouldn't really happen
   }
   
   index += sprintf((TX_PACKET + index), "%c\n", state_c);
+  index += sprintf((TX_PACKET + index), "%02d:%02d:%02d.%02d\n", GPS.time.hour(), GPS.time.minute(), GPS.time.second(), GPS.time.centisecond());  
   index += sprintf((TX_PACKET + index), "alt:%d\n", (int)GPS.altitude.meters());
   index += sprintf((TX_PACKET + index), "hdop:%d\n", (int)GPS.hdop.hdop());
-  index += sprintf((TX_PACKET + index), "lat :%d\n", (int)GPS.location.lat());
-  index += sprintf((TX_PACKET + index), "lon:%d\n", (int)GPS.location.lng());
-  index += sprintf((TX_PACKET + index), "speed: %d km/h\n", (int)GPS.speed.kmph());
+  index += sprintf((TX_PACKET + index), "lat:%.4f\n", GPS.location.lat());
+  index += sprintf((TX_PACKET + index), "lon:%.4f\n", GPS.location.lng());
+  index += sprintf((TX_PACKET + index), "speed:%dkm/h\n", (int)GPS.speed.kmph());
   TX_PACKET[index] = '\0';
 }
 
@@ -340,10 +335,13 @@ static void smart_delay(const unsigned long ms)
   Serial.println(start / SEC_1);
 
   // loop smart delay
-  while (millis() - start < ms && start) {
-
+  while (millis() - start < ms && start) 
+  {
     // feed gps
-    GPS.encode(GPS.read());
+    while (GPS.available() > 0)
+    {
+      GPS.encode(GPS.read());
+    }
     // add gps info to memory
     log_altitude();
   }
@@ -362,11 +360,17 @@ void assert_(int condition)
   while(1) {};
 }
 
+// 0.0740 
+int fracPart(double val, int n)
+{
+  return (int)((val - (int)(val))*pow(10,n));
+}
+
 
 void test_system()
 {
   Serial.println("Testing GPS");
-  smart_delay(10 * SEC_1);
+  smart_delay(100 * SEC_1);
   assert_(GPS.altitude.isUpdated());
   assert_(GPS.altitude.meters() > 0);
 
