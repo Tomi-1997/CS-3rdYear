@@ -6,7 +6,7 @@
 */
 
 #include "heltec.h" 
-#define BAND    433E6
+#define BAND    437250000
 
 void setup() 
 {
@@ -19,9 +19,9 @@ void setup()
   Serial.begin(115200);
   Serial.println("Serial init.");
 
-  LoRa.setSpreadingFactor(8);
+  LoRa.setSpreadingFactor(10);
   LoRa.setSignalBandwidth(125E3);
-  LoRa.setCodingRate4(4);
+  LoRa.setCodingRate4(5);
   LoRa.setSyncWord(0x12);
   LoRa.setPreambleLength(8);
   LoRa.receive();
@@ -44,6 +44,8 @@ void loop()
       char c = (char)LoRa.read();
       Serial.print(c);
     }
+    Serial.printf("rssi:%d\n", LoRa.packetRssi());
+    Serial.printf("snr:%f", LoRa.packetSnr());
     Serial.printf("\n--------------------[%d]--------------------\n", packetSize);
   }
 }
