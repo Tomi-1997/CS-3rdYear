@@ -1,13 +1,9 @@
 #include "Constants.h"
-#define LAUNCH 1
 
 Air530Class GPS;
-int PUMP_PIN = 0;
-
 char TX_PACKET[BUFFER_SIZE];      /* Packet to send */
-static RadioEvents_t RadioEvents; /*   */
-const int SEC_1 = 1000;
-int CONSECUTIVE_DANGER;           /* Count consecutive occurences which we are descending and below the required altitude. */
+static RadioEvents_t RadioEvents; /* LoRa radio object to send status to GS */
+int CONSECUTIVE_DANGER;           /* [UNUSED CURRENTLY] Count consecutive occurences which we are descending and below the required altitude. */
                                   /* If it's large enough maybe the GPS needs a restart or the liquid mechanism is stuck  */
 
 int ALTS[ALT_MEMORY_SIZE];        /* Remember past altitudes, make decision based on it */
@@ -37,13 +33,12 @@ double average_();
 double average(int* array, int start, int steps, int direction);
 int at_risk();
 void test_system();
-int fracPart(double val, int n);
+
 
 
 enum STATES State = INITIAL_ASCENT;
 void setup() {
   VextON();
-
   /* Serial Init */
   Serial.begin(115200);
 
@@ -55,8 +50,8 @@ void setup() {
   Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
                     LORA_SPREADING_FACTOR, LORA_CODINGRATE,
                     LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                    true, 0, 0, LORA_IQ_INVERSION_ON, 3000);
-  Radio.SetSyncWord(0x12);
+                    CRC, 0, 0, LORA_IQ_INVERSION_ON, 4000);
+  Radio.SetSyncWord(LORA_SYNCWORD);
 
   /* GPS Init */
   GPS.begin();
@@ -68,13 +63,8 @@ void setup() {
   for (int i = 0 ; i < ALT_MEMORY_SIZE; i++)
     ALTS[i] = 0;
   
+  
   Serial.println("Payload init");
-
-  if (!LAUNCH)
-  {
-    test_system();
-    while(1) {};
-  }
 }
 
 
@@ -82,6 +72,7 @@ void loop() {
   smart_delay(30 * SEC_1);  //every 30 secs
   preparePacket();
   sendPacket();
+  
   switch (State) {
     case INITIAL_ASCENT:
       {
@@ -91,10 +82,14 @@ void loop() {
 
     case FLOATING:
       {
-        CONSECUTIVE_DANGER = 0;
+        // CONSECUTIVE_DANGER = 0;
 
         // check if in danger, maybe add more delay
-        State = at_risk() ? DANGER : FLOATING;
+
+        if (GPS.altitude.age() < GPS_TOO_OLD)
+        {
+          State = at_risk() ? DANGER : FLOATING;
+        }
         break;
       }
 
@@ -102,15 +97,17 @@ void loop() {
       {
         /* Count how many times we had to pump in a row- if it's too much, must have ran out of liquid.
         Switch state to save on power.*/
-        CONSECUTIVE_DANGER++;
-        if (CONSECUTIVE_DANGER > MAX_DANGER_ITERS)
-        {
-          State = LIQUID_EMPTY;
-          break;
-        }
+        
+        
+        // CONSECUTIVE_DANGER++;
+        // if (CONSECUTIVE_DANGER > MAX_DANGER_ITERS)
+        // {
+        //   State = LIQUID_EMPTY;
+        //   break;
+        // }
 
         /* Danger = Going down, get rid of weight */
-        pump(2 * SEC_1);
+        pump(PUMP_ON_SEC * SEC_1);
 
         /* Wait a bit, check for changes- maybe there is still danger */
         State = STANDBY;
@@ -259,7 +256,7 @@ void log_altitude() {
 
 void pump(int seconds) {
   digitalWrite(PUMP_PIN, HIGH);   
-  delay(seconds);              
+  delay(seconds * SEC_1);              
   digitalWrite(PUMP_PIN, LOW);   
 }
 
@@ -277,7 +274,7 @@ void preparePacket() {
     case LIQUID_EMPTY:   { state_c = 'E'; break; }
     default:             { state_c = '-'; } // Shouldn't really happen
   }
-  
+
   index += sprintf((TX_PACKET + index), "%c\n", state_c);
   index += sprintf((TX_PACKET + index), "%02d:%02d:%02d.%02d\n", GPS.time.hour(), GPS.time.minute(), GPS.time.second(), GPS.time.centisecond());  
   index += sprintf((TX_PACKET + index), "alt:%d\n", (int)GPS.altitude.meters());
@@ -290,7 +287,6 @@ void preparePacket() {
 
 
 void sendPacket() {
-
   /* Turn colour to let user know data is sent */
   turnOnRGB(COLOR_SEND, 0);
   Radio.Send((uint8_t*)TX_PACKET, strlen(TX_PACKET));
@@ -360,19 +356,13 @@ void assert_(int condition)
   while(1) {};
 }
 
-// 0.0740 
-int fracPart(double val, int n)
-{
-  return (int)((val - (int)(val))*pow(10,n));
-}
-
 
 void test_system()
 {
-  Serial.println("Testing GPS");
-  smart_delay(100 * SEC_1);
-  assert_(GPS.altitude.isUpdated());
-  assert_(GPS.altitude.meters() > 0);
+  // Serial.println("Testing GPS");
+  // smart_delay(100 * SEC_1);
+  // assert_(GPS.altitude.isUpdated());
+  // assert_(GPS.altitude.meters() > 0);
 
   Serial.println("Testing LoRa");
   preparePacket();
