@@ -1,4 +1,4 @@
-### Pathfinder In A Limited Grid
+### Pathfinding In A Limited Grid
 Finds path from S to G while minimizing cost. <br>
 Cost of stepping on: H=5, R=3, D=1, X is forbidden <br>
 Defined algorithms are: <br>
