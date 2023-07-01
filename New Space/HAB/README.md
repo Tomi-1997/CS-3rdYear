@@ -12,7 +12,7 @@ It uploaded the file to this [github repository](https://github.com/sonyamonyaa/
 ### Launch
 ![D](https://github.com/Tomi-1997/CS-3rdYear/blob/main/New%20Space/HAB/pics/Launch.JPG) <br>
 ### Results
-The connectionion between the payload and the ground station was stable. <br> 
+The connection between the payload and the ground station was stable. <br> 
 Some kilometers after crossing the border to Jordan the GPS unit seems to have stopped updating. <br>
 The sent packet had a decreasing signal strength, but the gps information was constant. <br>
 As the rssi signal keep decreasing, we assume the unit kept floating. <br>
