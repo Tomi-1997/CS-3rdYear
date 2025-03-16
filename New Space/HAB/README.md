@@ -1,5 +1,11 @@
 # Long Range High Altitude Balloon
 
+### Target
+To keep our launched unit airborne for as long as possible. What we did: <br>
+- State machine to assess situation
+- Regulate weight by pumping water
+- Log GPS info and calculate data integrity
+
 ### Payload 
 
 A CubeCell GPS unit. <br>
