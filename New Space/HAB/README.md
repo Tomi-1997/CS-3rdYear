@@ -1,10 +1,10 @@
 # Long Range High Altitude Balloon
 
 ### Target
-To keep our launched unit airborne for as long as possible. What we did: <br>
-- State machine to assess situation
-- Regulate weight by pumping water
-- Log GPS info and calculate data integrity
+To keep our launched unit airborne for as long as possible. We did: <br>
+- Created a state machine to assess situation
+- Regulated weight by pumping water
+- Logged GPS info and calculated data integrity
 
 ### Payload 
 
